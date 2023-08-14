@@ -1,0 +1,86 @@
+# syntax=docker/dockerfile:1.4  # COPY --link 
+# for multi stage build
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS fetch-pure
+
+# Z-Shell related libraries.
+ARG PURE_URL=https://github.com/sindresorhus/pure.git
+ARG ZSHA_URL=https://github.com/zsh-users/zsh-autosuggestions
+ARG ZSHS_URL=https://github.com/zsh-users/zsh-syntax-highlighting.git
+
+RUN git clone --depth 1 ${PURE_URL} /opt/zsh/pure
+RUN git clone --depth 1 ${ZSHA_URL} /opt/zsh/zsh-autosuggestions
+RUN git clone --depth 1 ${ZSHS_URL} /opt/zsh/zsh-syntax-highlighting
+
+########################################################################
+# base image
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS train
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV PYTHONIOENCODING=UTF-8
+
+ENV TZ=Asia/Seoul
+ARG DEBIAN_FRONTEND=noninteractive
+
+# args
+ARG GID
+ARG UID
+ARG USR
+ARG GRP
+ARG PASSWD=hello
+ARG WORKDIR_PATH
+ENV PYTHONPATH=${WORKDIR_PATH}
+
+# apt
+COPY requirements_dev.txt /requirements_dev.txt
+RUN apt-get update && apt-get -y --no-install-recommends install \
+    zsh \ 
+    vim \
+    nano \
+    tmux \
+ && rm -rf /var/lib/apt/lists/*
+
+# pip
+RUN pip3 install --upgrade pip
+RUN pip3 install tensorflow==2.6.2
+RUN pip3 install torch==1.13.0+cu116 torchvision==0.14.0+cu116 -f https://download.pytorch.org/whl/torch_stable.html
+RUN pip3 --no-cache-dir install -r /requirements_dev.txt
+
+# user
+RUN groupadd -f -g ${GID} ${GRP} && \
+    useradd --shell /bin/zsh --create-home -u ${UID} -g ${GRP} \
+        -p $(openssl passwd -1 ${PASSWD}) ${USR} && \
+    echo "${USR} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+USER ${USR}
+ENV HOME=/home/${USR}
+
+# 터미널 설정 변경
+# option 방향키로 command line 편하게 사용하기
+# iterm > preferences > profiles > keys
+# option + right : send escape sequence, f
+# option + left : send escape sequence, b
+ARG ZSHRC_PATH=${HOME}/.zshrc
+ARG ZSH_PURE_PATH=${HOME}/.zsh/pure
+ARG ZSH_AUTO_PATH=${HOME}/.zsh/zsh-autosuggestions
+ARG ZSH_HIGHLIGHT_PATH=${HOME}/.zsh/zsh-syntax-highlighting
+
+# oh-my-zsh, dir, file color등에 영향
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
+# pure, highlight
+COPY --link --from=fetch-pure --chown=${UID}:${GID} /opt/zsh ${HOME}/.zsh
+RUN {   echo "fpath+=${ZSH_PURE_PATH}"; \
+        echo "typeset -A mycolors=(lightblue \"#9dd6f9\")"; \
+        echo "zstyle :prompt:pure:path color \$mycolors[lightblue]"; \
+        echo "zstyle ':prompt:pure:prompt:*' color magenta"; \
+        # echo "zstyle ':prompt:pure:prompt:*' color cyan"; \
+        echo "zstyle :prompt:pure:git:stash show yes"; \
+        echo "autoload -Uz promptinit; promptinit"; \
+        echo "prompt pure"; \
+        echo "source ${ZSH_HIGHLIGHT_PATH}/zsh-syntax-highlighting.zsh"; \
+    } >> ${ZSHRC_PATH}
+
+WORKDIR ${WORKDIR_PATH}
+
+CMD ["/bin/zsh"] 

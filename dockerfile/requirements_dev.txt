@@ -1,0 +1,17 @@
+accelerate
+gputil
+hydra-core
+hydra-optuna-sweeper
+h5py
+joblib
+jupyterlab
+matplotlib
+mlflow
+omegaconf
+openpyxl
+pandas
+pydicom
+pylidc
+pylint
+seaborn
+tqdm
