@@ -1,13 +1,13 @@
 version: '3.0'  # YAML 파일 포맷 버전
 services:
-  ml-base:
+  railroad-base:
     image: ${IMAGE_NAME_BASE}
     build:
       context: ${DOCKER_BUILD_CONTEXT_PATH}
       dockerfile: ${DOCKERFILE_NAME_BASE}
 
-  ml-dev:
-    hostname: ml-dev
+  railroad-dev:
+    hostname: railroad-dev
     image: ${IMAGE_NAME_DEV}
     container_name: ${CONTAINER_NAME_DEV}
     ipc: host 
@@ -23,7 +23,7 @@ services:
       dockerfile: ${DOCKERFILE_NAME_DEV}
       args: 
         BASE_IMAGE: ${IMAGE_NAME_BASE}
-        WORKDIR_PATH: ${WORKDIR_PATH:-/opt/ml}
+        WORKDIR_PATH: ${WORKDIR_PATH:-/opt/railroad}
         GRP: ${GRP:-noname}
         USR: ${USR:-noname}
         GID: ${GID:-noname}
@@ -36,8 +36,8 @@ services:
               count: all
               capabilities: [ gpu ]
 
-  ml-dev-mac:
-    hostname: ml-dev-mac
+  railroad-dev-mac:
+    hostname: railroad-dev-mac
     image: ${IMAGE_NAME_DEV_MAC}
     container_name: ${CONTAINER_NAME_DEV_MAC}
     ipc: host 
@@ -53,7 +53,7 @@ services:
       dockerfile: ${DOCKERFILE_NAME_DEV_MAC}
       args: 
         BASE_IMAGE: ${IMAGE_NAME_BASE}
-        WORKDIR_PATH: ${WORKDIR_PATH:-/opt/ml}
+        WORKDIR_PATH: ${WORKDIR_PATH:-/opt/railroad}
         GRP: ${GRP:-noname}
         USR: ${USR:-noname}
         GID: ${GID:-noname}
