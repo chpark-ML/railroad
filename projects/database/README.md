@@ -3,7 +3,7 @@
 - `train/val` dataset (2,500 time points)
 - `test` dataset (500 time points)
     - squential dataset의 마지막 time points로 주어짐.
-<img src="image.png"  width="600" height="200">
+<img src="image.png"  width="500" height="200">
 
 - train/val dataset `fold split` strategy
     - 학습 데이터셋 중간에 검증 데이터셋을 설정하면 연속성이 끊어지기 때문에 train/val dataset의 *앞쪽* 또는 *뒷쪽*을 validation dataset으로 정의
