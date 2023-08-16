@@ -1,4 +1,5 @@
 accelerate
+flake8
 gputil
 hydra-core
 hydra-optuna-sweeper
@@ -13,5 +14,10 @@ pandas
 pydicom
 pylidc
 pylint
+pymongo
+pytest
+rich
+scikit-image
+scikit-learn
 seaborn
 tqdm

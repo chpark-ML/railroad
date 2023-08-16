@@ -1,0 +1,13 @@
+_target_: projects.DC_prediction.train.Trainer
+
+gpus: auto
+max_epoch: 200
+test_epoch_start: ${trainer.max_epoch}
+fast_dev_run: False
+early_stop_patience: null
+use_amp: False
+resume_from_checkpoint: null
+log_every_n_steps: 50
+
+benchmark: False
+deterministic: True

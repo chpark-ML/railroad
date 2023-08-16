@@ -1,0 +1,35 @@
+# MLflow
+experiment_tool:
+  name: mlflow
+  enable: True
+  server_uri: http://172.31.10.111:18002
+  run_name: null
+  experiment_name: null
+
+# specify default training configuration
+defaults:
+  - trainer: default
+  - loader: default
+  - criterion: loss
+  - model: unet_3d_cls
+  - optim: adamw
+  - scheduler: one_cycle_lr
+  - experiment_tool: mlflow
+
+run_modes:
+  - train
+  - val
+  - test
+
+hydra:
+  run:
+    dir: ./outputs/cls/${experiment_tool.run_group}/${experiment_tool.run_name}/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    chdir: True  # keep hydra = 1.1 change directory behavior
+
+seed: 1234
+
+debug: False
+
+# pretty print config at the start of the run using Rich library
+print_config: True

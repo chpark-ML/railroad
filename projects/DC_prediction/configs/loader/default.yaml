@@ -1,0 +1,11 @@
+_target_: torch.utils.data.DataLoader
+
+dataset:
+  _target_: projects.DC_prediction.datasets.railroad.RailroadDataset
+  mode: train
+
+batch_size: 4
+num_workers: 0
+pin_memory: True
+prefetch_factor: 2
+drop_last: False

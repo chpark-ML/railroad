@@ -17,5 +17,5 @@
     - `val-pre-500`는 주어진 train/val 데이터셋의 *처음* 부분 *500* time points를 validation dataset 나머지를 train dataset으로 활용
     - `val-pre-1000`는 주어진 train/val 데이터셋의 *처음* 부분 *1,000* time points를 validation dataset 나머지를 train dataset으로 활용
     - `val-post-500`는 주어진 train/val 데이터셋의 *마지막* 부분 *500* time points를 validation dataset 나머지를 train dataset으로 활용
-    - `val-post-10900`는 주어진 train/val 데이터셋의 *마지막* 부분 *1,000* time points를 validation dataset 나머지를 train dataset으로 활용
+    - `val-post-1000`는 주어진 train/val 데이터셋의 *마지막* 부분 *1,000* time points를 validation dataset 나머지를 train dataset으로 활용
 - 최종적으로 획득되는 네개 모델의 앙상블 모델을 제안해보면 좋을 것으로 사료됨.
