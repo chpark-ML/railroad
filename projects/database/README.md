@@ -8,7 +8,7 @@
     squential dataset의 마지막 time points
 
 ### Overall status
-<img src="image.png"  width="500" height="200">
+<img src="dataset.png">
 
 ### train/val dataset `fold split` strategy
 - 학습 데이터셋 중간에 검증 데이터셋을 설정하면 연속성이 끊어지기 때문에 train/val dataset의 *앞쪽* 또는 *뒷쪽*을 validation dataset으로 정의
@@ -19,3 +19,10 @@
     - `val-post-500`는 주어진 train/val 데이터셋의 *마지막* 부분 *500* time points를 validation dataset 나머지를 train dataset으로 활용
     - `val-post-1000`는 주어진 train/val 데이터셋의 *마지막* 부분 *1,000* time points를 validation dataset 나머지를 train dataset으로 활용
 - 최종적으로 획득되는 네개 모델의 앙상블 모델을 제안해보면 좋을 것으로 사료됨.
+
+<img src="fold_pre.png">
+<img src="fold_post.png">
+
+### Input & Output
+
+<img src="input_output.png">
