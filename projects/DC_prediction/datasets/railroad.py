@@ -5,35 +5,27 @@ import pandas as pd
 from torch.utils.data import Dataset
 
 from projects.DC_prediction.utils.enums import RunMode
-from projects.DC_prediction.utils.constants import (VIBRATION_DATA_STRAIGHT, LANE_DATA_STRAIGHT, 
-                                                    VIBRATION_DATA_CURVED, LANE_DATA_CURVED,
-                                                    YAW_TYPES, RAIL_TYPES)
+import projects.DC_prediction.utils.constants as C
 
 
 def _get_start_distance(mode: RunMode):
     pass
 
 
-def _get_df() -> Dict[str, pd.DataFrame]:
+def _get_df() -> Dict[str, Dict[str, pd.DataFrame]]:
     dict_df_rail = dict()  # {'curved': {'30': df, '40': df, ...},
                            #  'straight': {'30': df, '40': df, ...} }
-    # loop for rail type
-    for rail in RAIL_TYPES:  
-        # loop for yaw type
+    for rail in C.RAIL_TYPES:  
+        drive_files = C.VIBRATION_DATA_CURVED if rail == "curved" else C.VIBRATION_DATA_STRAIGHT
+        df_lane = pd.read_csv(C.LANE_DATA_CURVED if rail == "curved" else C.LANE_DATA_STRAIGHT)
+        df_lane = df_lane.set_index(keys=['Distance'], inplace=False)
+        
         dict_df_yaw = dict()
-        for yaw in YAW_TYPES:  
-            if rail == 'curved':
-                for _dir in VIBRATION_DATA_CURVED:
-                    df_vib = pd.read_csv(_dir).set_index(keys=['Distance'], inplace=False)
-                    df_lane = pd.read_csv(LANE_DATA_CURVED).set_index(keys=['Distance'], inplace=False)
-                    df_concat = pd.concat([df_vib, df_lane], axis=1).sort_index(ascending=True)
-                    dict_df_yaw[yaw] = df_concat
-            elif rail == 'straight':
-                for _dir in VIBRATION_DATA_STRAIGHT:
-                    df_vib = pd.read_csv(_dir).set_index(keys=['Distance'], inplace=False)
-                    df_lane = pd.read_csv(LANE_DATA_STRAIGHT).set_index(keys=['Distance'], inplace=False)
-                    df_concat = pd.concat([df_vib, df_lane], axis=1).sort_index(ascending=True)
-                    dict_df_yaw[yaw] = df_concat 
+        for _dir in drive_files:
+            df_vib = pd.read_csv(_dir).set_index(keys=['Distance'], inplace=False)
+            df_concat = pd.concat([df_vib, df_lane], axis=1).sort_index(ascending=True)
+            yaw = _dir.stem.split("_")[-1][1:]
+            dict_df_yaw[yaw] = df_concat
         dict_df_rail[rail] = dict_df_yaw
     return dict_df_rail
 
