@@ -1,5 +1,4 @@
-import os
-from typing import List, Optional, Sequence, Union
+from typing import Union, Dict
 
 import numpy as np
 import pandas as pd
@@ -15,7 +14,7 @@ def _get_start_distance(mode: RunMode):
     pass
 
 
-def _get_df():
+def _get_df() -> Dict[str, pd.DataFrame]:
     dict_df_rail = dict()  # {'curved': {'30': df, '40': df, ...},
                            #  'straight': {'30': df, '40': df, ...} }
     # loop for rail type
@@ -24,19 +23,18 @@ def _get_df():
         dict_df_yaw = dict()
         for yaw in YAW_TYPES:  
             if rail == 'curved':
-                for dir in VIBRATION_DATA_CURVED:
-                    df_vib = pd.read_csv(dir).set_index(keys=['Distance'], inplace=False)
+                for _dir in VIBRATION_DATA_CURVED:
+                    df_vib = pd.read_csv(_dir).set_index(keys=['Distance'], inplace=False)
                     df_lane = pd.read_csv(LANE_DATA_CURVED).set_index(keys=['Distance'], inplace=False)
                     df_concat = pd.concat([df_vib, df_lane], axis=1).sort_index(ascending=True)
                     dict_df_yaw[yaw] = df_concat
             elif rail == 'straight':
-                for dir in VIBRATION_DATA_STRAIGHT:
-                    df_vib = pd.read_csv(dir).set_index(keys=['Distance'], inplace=False)
+                for _dir in VIBRATION_DATA_STRAIGHT:
+                    df_vib = pd.read_csv(_dir).set_index(keys=['Distance'], inplace=False)
                     df_lane = pd.read_csv(LANE_DATA_STRAIGHT).set_index(keys=['Distance'], inplace=False)
                     df_concat = pd.concat([df_vib, df_lane], axis=1).sort_index(ascending=True)
                     dict_df_yaw[yaw] = df_concat 
         dict_df_rail[rail] = dict_df_yaw
-        
     return dict_df_rail
 
 
@@ -48,7 +46,7 @@ class RailroadDataset(Dataset):
         self.df = _get_start_distance(self.mode) # TODO: # row should be corresponding to a starting point of a sample window (start distance info, rail type, yaw type)
         self.dfs = _get_df()  # dictionary of dictionary for (rail type, yaw type)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int):
         """
         Resize -> Windowing -> Additoinal data augmentation
         """

@@ -1,11 +1,11 @@
 # Dataset 
 
 ### `train/val` dataset (2,500 time points)
-    squential dataset depending on the followings :
+    sequential dataset depending on the followings :
         [yaw damper (30, 40, 50, 70, 100)]
         ["curved", "straight"]
 ### `test` dataset (500 time points)
-    squential dataset의 마지막 time points
+    sequential dataset의 마지막 time points
 
 ## Overall Dataset
 <img src="images/dataset.png">
@@ -17,6 +17,22 @@
     - `val-pre-N-H`
     - `val-post-N-H`
 - 최종적으로 획득되는 모델들의 앙상블 모델을 제안해보면 좋을 것으로 사료됨.
+
+## 선로 정보
+거리 별 선로의 정보가 담겨져있는데, 이게 선로유형별로 정보가 달라서 모델을 따로 만드는 것이 좋을 것으로 보인다.
+```
+       type                      name                       description
+0     curve                  Distance                             거리[m]
+1     curve                 Curvature                          곡률[1/km]
+2     curve           Vertical offset                      선로중심부 높이[mm]
+3     curve        Cross level offset                            캔트[mm]
+4  straight                  Distance                             거리[m]
+5  straight  Cross level irregularity  우측 선로에 대한 좌측 선로 높이차(캔트) 불규칙도[mm]
+6  straight    Curvature irregularity                 곡선에 대한 불규칙도[1/km]
+7  straight      Lateral irregularity                       수평 불규칙도[mm]
+8  straight     Vertical irregularity                       수직 불규칙도[mm]
+9  straight           Gauge variation           선로 게이지(좌우거리차이) 불규칙도[mm]
+```
 
 <img src="images/fold_pre.png">
 <img src="images/fold_post.png">
