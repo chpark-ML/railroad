@@ -259,13 +259,13 @@ class Trainer():
     def get_initial_model_metric(self):
         return Metrics()
 
-    def get_samples_to_validate(self, dict_probs, dict_annots):
-        for i_attr in self.target_attr_to_train:
-            # samples where annotation label is not ambiguous, 0.5.
-            dict_probs[i_attr] = dict_probs[i_attr][dict_annots[i_attr] != 0.5]
-            dict_annots[i_attr] = (dict_annots[i_attr][dict_annots[i_attr] != 0.5] > 0.5) * 1.0
+    # def get_samples_to_validate(self, dict_probs, dict_annots):
+    #     for i_attr in self.target_attr_to_train:
+    #         # samples where annotation label is not ambiguous, 0.5.
+    #         dict_probs[i_attr] = dict_probs[i_attr][dict_annots[i_attr] != 0.5]
+    #         dict_annots[i_attr] = (dict_annots[i_attr][dict_annots[i_attr] != 0.5] > 0.5) * 1.0
 
-        return dict_probs, dict_annots
+    #     return dict_probs, dict_annots
 
     def get_metrics(self, dict_probs, dict_annots):
         dict_losses, losses = self.criterion(dict_probs, dict_annots, is_logit=False, is_logistic=True)
