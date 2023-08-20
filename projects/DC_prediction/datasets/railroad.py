@@ -8,7 +8,7 @@ from projects.DC_prediction.utils.enums import RunMode
 import projects.DC_prediction.utils.constants as C
 
 
-def _get_start_distance(mode: RunMode):
+def _get_start_distance(mode: RunMode, val_type, window_length, history_length):
     pass
 
 
@@ -31,11 +31,16 @@ def _get_df() -> Dict[str, Dict[str, pd.DataFrame]]:
 
 
 class RailroadDataset(Dataset):
-    def __init__(self, mode: Union[str, RunMode], window_length, history_length):
+    def __init__(self, mode: Union[str, RunMode], val_type, window_length, history_length):
+        assert val_type == 'pre' or val_type == 'post'
+        assert window_length > 500
+        assert history_length < window_length
+
         self.mode: RunMode = RunMode(mode) if isinstance(mode, str) else mode
+        self.val_type = val_type
         self.window_length = window_length
         self.history_length = history_length
-        self.df = _get_start_distance(self.mode) # TODO: # row should be corresponding to a starting point of a sample window (start distance info, rail type, yaw type)
+        self.df = _get_start_distance(self.mode, self.val_type, self.window_length, self.history_length) # TODO: # row should be corresponding to a starting point of a sample window (start distance info, rail type, yaw type)
         self.dfs = _get_df()  # dictionary of dictionary for (rail type, yaw type)
 
     def __getitem__(self, index: int):
