@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 @hydra.main(version_base='1.2', config_path='configs', config_name='config')
 def main(config: omegaconf.DictConfig) -> None:
-
     logger.info("Training DC prediction Model.")
     return train(config)
 

@@ -30,9 +30,6 @@ T = TypeVar('T', bound='Trainer')
 @dataclass
 class Metrics():
     loss: float = np.inf
-    multi_label_losses: dict = None
-    multi_label_metrics: dict = None
-    multi_label_threshold: dict = None
 
     def __str__(self):
         return f'loss_{self.loss:.4f}'
@@ -63,7 +60,7 @@ def _get_loaders_and_trainer(config, optuna_trial=None):
     logger.info(f"Instantiating dataloader <{config.loader._target_}>")
     run_modes = [RunMode(m) for m in config.run_modes] if 'run_modes' in config else [x for x in RunMode]
     loaders = {mode: hydra.utils.instantiate(config.loader,
-                                                dataset={'mode': mode},
+                                                dataset={'mode': mode}, shuffle=(mode == RunMode.TRAIN),
                                                 drop_last=(mode == RunMode.TRAIN)) for mode in run_modes}
 
     # Trainers
@@ -123,9 +120,8 @@ class Trainer():
 
     def __init__(self, model, optimizer, scheduler, criterion, logging_tool, gpus, fast_dev_run, max_epoch,
                  log_every_n_steps=1, test_epoch_start=0, resume_from_checkpoint=False, benchmark=False,
-                 deterministic=True, fine_tune_info=None, is_distributed=False, is_head_rank=False,
-                 early_stop_patience: int = None, use_amp: bool = True, optuna_trial: optuna.Trial = None, **kwargs) -> None:
-        self.model = model
+                 deterministic=True, fine_tune_info=None, early_stop_patience: int = None, 
+                 use_amp: bool = True, optuna_trial: optuna.Trial = None, **kwargs) -> None:
         self.path_best_model = ''
         self.epoch_best_model = 0
         self.optimizer = optimizer
@@ -144,7 +140,6 @@ class Trainer():
         self.log_every_n_steps = log_every_n_steps
         self.test_epoch_start = test_epoch_start
         self.resume_from_checkpoint = resume_from_checkpoint
-        self.is_distributed = is_distributed
         # This constant is used in fit function for counting epochs for early stop functionality.
         self.early_stop_patience = early_stop_patience if early_stop_patience else max_epoch
         self.optuna_trial = optuna_trial
@@ -157,14 +152,6 @@ class Trainer():
         self.device = torch.device(torch_device)
         self.model = model.to(self.device)
 
-        # Load pretrained encoder
-        if fine_tune_info.pretrained_encoder:
-            self._load_pretrained_weight(fine_tune_info.pretrained_encoder)
-
-        self.is_head_rank = is_head_rank
-
-        self.dict_threshold = None
-
     @classmethod
     def hydrate_trainer(cls, config: omegaconf.DictConfig, loaders, model, logging_tool, optuna_trial=None) -> T:
         # Init model
@@ -175,7 +162,7 @@ class Trainer():
         if "steps_per_epoch" in config.scheduler:
             config.scheduler["steps_per_epoch"] = len(loaders[RunMode.TRAIN])
         scheduler = hydra.utils.instantiate(config.scheduler, optimizer=optimizer)
-        criterion = hydra.utils.instantiate(config.criterion, train_df=loaders[RunMode.TRAIN].dataset.meta_df)
+        criterion = hydra.utils.instantiate(config.criterion)
 
         # Init trainer
         logger.info(f'Instantiating trainer <{config.trainer._target_}>')
@@ -185,30 +172,24 @@ class Trainer():
                                        scheduler=scheduler,
                                        criterion=criterion,
                                        logging_tool=logging_tool,
-                                       is_distributed=config.ddp.enable,
                                        use_amp=config.trainer.use_amp,
                                        optuna_trial=optuna_trial)
 
     def train_epoch(self, epoch, train_loader) -> Metrics:
-        super().train_epoch(epoch, train_loader)
+        self.model.train()
         train_losses = []
         start = time.time()
-        breakpoint()
-        train_loader.dataset.shuffle()
         for i, data in enumerate(train_loader):
             self.optimizer.zero_grad()
-            dicom = data['dicom'].to(self.device)
-            _check_any_nan(dicom)
-            annots = dict()
-            for key, value in data['ann'].items():
-                _annot = value.to(self.device).float()
-                _check_any_nan(_annot)
-                annots[key] = torch.unsqueeze(_annot, dim=1)
+            x = data['x'].to(self.device)
+            y = data['y'].to(self.device)
+            _check_any_nan(x)
+            _check_any_nan(y)
 
             # forward propagation
             with torch.autocast(device_type=self.device.type, enabled=self.use_amp):
-                logits = self.model(dicom)
-                dict_loss, loss = self.criterion(logits, annots, is_logit=True, is_logistic=True)
+                logits = self.model(x)
+                loss = self.criterion(logits, y)
                 train_losses.append(loss.detach())
 
             # set trace for checking nan values
@@ -234,7 +215,7 @@ class Trainer():
                 idx = i + 1
                 global_step = epoch * len(train_loader) + idx
                 batch_time = time.time() - start
-                self.log_metrics(RunMode.TRAIN.value, global_step, Metrics(loss.detach(), dict_loss, None),
+                self.log_metrics(RunMode.TRAIN.value, global_step, Metrics(loss.detach()),
                                  log_prefix=f'[{epoch}/{self.max_epoch}] [{i}/{len(train_loader)}]',
                                  mlflow_log_prefix='STEP',
                                  duration=batch_time)
@@ -259,35 +240,24 @@ class Trainer():
     def get_initial_model_metric(self):
         return Metrics()
 
-    # def get_samples_to_validate(self, dict_probs, dict_annots):
-    #     for i_attr in self.target_attr_to_train:
-    #         # samples where annotation label is not ambiguous, 0.5.
-    #         dict_probs[i_attr] = dict_probs[i_attr][dict_annots[i_attr] != 0.5]
-    #         dict_annots[i_attr] = (dict_annots[i_attr][dict_annots[i_attr] != 0.5] > 0.5) * 1.0
+    def get_metrics(self, preds, annots):
+        losses = self.criterion(preds, annots)
+        result_dict = {}
 
-    #     return dict_probs, dict_annots
-
-    def get_metrics(self, dict_probs, dict_annots):
-        dict_losses, losses = self.criterion(dict_probs, dict_annots, is_logit=False, is_logistic=True)
-        result_dict = get_binary_classification_metrics(dict_probs, dict_annots, self.dict_threshold)
-
-        return losses.detach(), dict_losses, result_dict
+        return losses.detach(), result_dict
 
     def _inference(self, loader):
         list_logits = []
         list_annots = []
 
         for data in tqdm.tqdm(loader):
-            dicom = data['dicom'].to(self.device)
-            annots = dict()
-            for key in self.target_attr_to_train:
-                value = data['ann'][key]
-                annots[key] = torch.unsqueeze(value.to(self.device).float(), dim=1)
-            _check_any_nan(dicom)
-            logits = self.model(dicom)
+            x = data['x'].to(self.device)
+            y = data['y'].to(self.device)
+            _check_any_nan(x)
+            logits = self.model(x)
 
             list_logits.append(logits)
-            list_annots.append(annots)
+            list_annots.append(y)
 
             if self.fast_dev_run:
                 # Runs 1 train batch and program ends if 'fast_dev_run' set to 'True'
@@ -295,31 +265,27 @@ class Trainer():
                 # FIXME: progress bar does not update when 'fast_dev_run==True'
                 break
 
-        dict_probs = {key: torch.vstack([torch.sigmoid(i_logits[key]) for i_logits in list_logits]).squeeze() for key in
-                      self.target_attr_to_train}
-        dict_annots = {key: torch.vstack([i_annots[key] for i_annots in list_annots]).squeeze() for key in
-                       self.target_attr_to_train}
+        preds = torch.vstack(list_logits).squeeze()
+        annots = torch.vstack(list_annots).squeeze()
 
-        dict_probs, dict_annots = self.get_samples_to_validate(dict_probs, dict_annots)
-
-        return dict_probs, dict_annots
+        return preds, annots
 
     @torch.no_grad()
     def validate_epoch(self, epoch, val_loader) -> Metrics:
-        super().validate_epoch(epoch, val_loader)
-        dict_probs, dict_annots = self._inference(val_loader)
-        loss, dict_loss, dict_metrics = self.get_metrics(dict_probs, dict_annots)
+        self.model.eval()
+        preds, annots = self._inference(val_loader)
+        loss, dict_metrics = self.get_metrics(preds, annots)
         self.scheduler.step("epoch_val", loss)
 
-        return Metrics(loss, dict_loss, dict_metrics, self.dict_threshold)
+        return Metrics(loss)
 
     @torch.no_grad()
     def test_epoch(self, epoch, test_loader) -> Metrics:
-        super().test_epoch(epoch, test_loader)
-        dict_probs, dict_annots = self._inference(test_loader)
-        loss, dict_loss, dict_metrics = self.get_metrics(dict_probs, dict_annots)
+        self.model.eval()
+        preds, annots = self._inference(test_loader)
+        loss, dict_metrics = self.get_metrics(preds, annots)
 
-        return Metrics(loss, dict_loss, dict_metrics, self.dict_threshold)
+        return Metrics(loss)
 
     def save_best_metrics(self, val_metrics: Metrics, best_metrics: Metrics, epoch) -> (
             object, bool):
@@ -346,15 +312,93 @@ class Trainer():
         if self.use_amp:
             checkpoint['scaler'] = self.scaler.state_dict()
 
-        for key, value in self.dict_threshold.items():
-            checkpoint[key] = value
+    def _run_epoch(self, epoch, train_loader, val_loader, test_loader, best_model_metrics: object):
+        self.epoch = epoch
 
-        if not self.is_distributed or (self.is_distributed and self.is_head_rank):
-            # Save when
-            # 1. Experiments without DDP save the checkpoint as usual.
-            # 2. Use DDP and should be head rank
-            torch.save(checkpoint, model_path)
+        # Train for one epoch
+        start = time.time()
+        train_metrics = self.train_epoch(epoch, train_loader)
+        self.log_lr(self.get_lr(), epoch, log_prefix=f'[{epoch}/{self.max_epoch}]', mlflow_log_prefix='EPOCH')
+        self.log_metrics(RunMode.TRAIN.value, epoch, train_metrics, log_prefix=f'[{epoch}/{self.max_epoch}]',
+                         mlflow_log_prefix='EPOCH', duration=time.time() - start)
 
+        # Validation for one epoch
+        val_metrics = self.validate_epoch(epoch, val_loader)
+        self.log_metrics(RunMode.VALIDATE.value, epoch, val_metrics, mlflow_log_prefix='EPOCH')
+
+        if self.optuna_trial is not None:
+            # Report intermediate objective value.
+            self.optuna_trial.report(val_metrics.get_representative_metric(), epoch)
+
+            # Handle pruning based on the intermediate value.
+            if self.optuna_trial.should_prune():
+                raise optuna.TrialPruned()
+
+        # Test if possible
+        test_metrics = None
+        if test_loader and epoch >= self.test_epoch_start:
+            test_metrics = self.test_epoch(epoch, test_loader)
+            self.log_metrics(RunMode.TEST.value, epoch, test_metrics, mlflow_log_prefix='EPOCH')
+
+        # Save model and return metrics
+        best_metrics, found_better = self.save_best_metrics(val_metrics, best_model_metrics, epoch)
+        if found_better:
+            self.log_metrics('best', epoch, best_metrics)
+
+        return best_metrics, found_better
+
+    def fit(self, loaders: dict):
+        """
+        Fit and make the model.
+        Args:
+            loaders: a dictionary of data loaders keyed by RunMode.
+        Returns:
+            Metric
+        """
+        logger.info(
+            f"Size of datasets {dict((mode, len(loader.dataset)) for mode, loader in loaders.items())}")
+        if self.resume_from_checkpoint:
+            # Not sure if we need the below code
+            # model_dir = self.resume_from_checkpoint
+            # model_path = sorted(pathlib.Path(model_dir).glob('*pt'), key=lambda x: float(x.name.split('_')[1]))[-1]
+            # self.load_checkpoint(model_path)
+            self.load_checkpoint(self.resume_from_checkpoint)
+
+        self.logging_tool.log_param('save_dir', os.getcwd())
+
+        # Reset the counters
+        self.epoch = 0
+        self.resume_epoch = 0
+
+        # Training loop
+        patience = 0
+        best_model_metrics = self.get_initial_model_metric()
+        for epoch in range(self.resume_epoch, self.resume_epoch + 2 if self.fast_dev_run else self.max_epoch):
+            best_model_metrics, found_better = self._run_epoch(epoch,
+                                                               loaders[RunMode.TRAIN], loaders[RunMode.VALIDATE],
+                                                               loaders.get(RunMode.TEST, None),
+                                                               best_model_metrics=best_model_metrics)
+            # Early Stop if patience reaches threshold.
+            patience = 0 if found_better else patience + 1
+            if patience >= self.early_stop_patience:
+                logger.info(f"Met the early stop condition. Stopping at epoch # {epoch}.")
+                break
+
+        return best_model_metrics
+    
+
+    def log_metrics(self, run_mode_str: str, step, metrics: object, log_prefix='', mlflow_log_prefix='', duration=None):
+        """ Log the metrics to logger and to mlflow if mlflow is used. Metrics could be None if learning isn't
+        performed for the epoch. """
+        self.logging_tool.log_metrics(run_mode_str=run_mode_str,
+                                      step=step, metrics=metrics,
+                                      log_prefix=log_prefix,
+                                      mlflow_log_prefix=mlflow_log_prefix,
+                                      duration=None)
+
+    def log_lr(self, lr: float, step, log_prefix='', mlflow_log_prefix='', duration=None):
+        """ Log the learning rate to logger and to mlflow if mlflow is used. """
+        self.logging_tool.log_lr(lr, step, log_prefix, mlflow_log_prefix, duration)
 
 class SchedulerTool:
     """

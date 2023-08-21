@@ -27,6 +27,12 @@ _DEFAULT_CONFIG_FILE = os.path.join(_THIS_DIR, '..', 'configs', 'config.yaml')
 logger = logging.getLogger(__name__)
 
 
+def get_host_ip_address():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    return s.getsockname()[0]
+
+
 def _seed_everything(seed):
     os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
@@ -71,7 +77,6 @@ def set_config(config: OmegaConf, default_config_path: str = _DEFAULT_CONFIG_FIL
         logger.info("Running in debug mode <config.debug=True>")
         config.trainer.fast_dev_run = True
         config.experiment_tool.enable = False
-        config.ddp.enable = False
 
     # force debugger friendly configuration if <config.trainer.fast_dev_run=True>
     if config.trainer.get('fast_dev_run'):

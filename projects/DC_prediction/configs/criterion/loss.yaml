@@ -1,8 +1,1 @@
-_target_: monai.losses.DiceFocalLoss
-
-sigmoid: False
-batch: True
-squared_pred: True
-focal_weight:
-lambda_dice: 1.0
-lambda_focal: 1.0
+_target_: torch.nn.MSELoss
