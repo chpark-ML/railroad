@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 YAW_TYPES = ['30', '40', '50', '70', '100']
+YAW_MAPPER = {yaw: idx for idx, yaw in enumerate(YAW_TYPES)}
 RAIL_TYPES = ['curved', 'straight']
 
 PREDICT_COLS = ["YL_M1_B1_W1", "YR_M1_B1_W1", "YL_M1_B1_W2", "YR_M1_B1_W2"]

@@ -2,9 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import projects.DC_prediction.utils.constants as C
+
 
 class FusionBlock(nn.Module):
-    def __init__(self, inplanes, planes, kernel_size=1, stride=1, padding = 0):
+    def __init__(self, inplanes, planes, kernel_size=1, stride=1, padding=0):
         super(FusionBlock, self).__init__()
         self.conv = nn.Conv2d(inplanes, planes, kernel_size=kernel_size, stride=stride, padding=padding, padding_mode='replicate', bias=False)
         self.norm = nn.InstanceNorm2d(planes, affine=False)
@@ -16,26 +18,27 @@ class FusionBlock(nn.Module):
         x_concat = self.conv(x_concat)
         x_concat = self.norm(x_concat)
         x_concat = self.act_f(x_concat)
-
         return x_concat
-    
+
 
 class ResidualBlock(nn.Module):
     expansion = 1
-    def __init__(self, inplanes, planes, kernel_size=1, stride=1, dilation=1, padding = 0, flag_res = True):
+    def __init__(self, inplanes, planes, kernel_size=5, stride=1, dilation=1, padding=0, flag_res=True):
         super(ResidualBlock, self).__init__()
         self.padding = padding
         self.dilation = dilation
         self.flag_res = flag_res
-        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=kernel_size, stride=stride, padding=padding, padding_mode='replicate', bias=False)
+        self.conv1 = nn.Conv2d(inplanes, planes,
+                               kernel_size=kernel_size, stride=stride, padding=padding,
+                               padding_mode='replicate', bias=False)
         self.norm1 = nn.InstanceNorm2d(planes, affine=False)
 
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=1, stride=1, padding=0, padding_mode='replicate', bias=False)
+        self.conv2 = nn.Conv2d(planes, planes,
+                               kernel_size=1, stride=1, padding=0,
+                               padding_mode='replicate', bias=False)
         self.norm2 = nn.InstanceNorm2d(planes, affine=False)
 
-        self.act_f = nn.ReLU(inplace=True)
-
-        if self.flag_res == True:
+        if self.flag_res:
             if stride != 1 or inplanes != planes * self.expansion :
                 self.downsample = nn.Sequential(
                         nn.Conv2d(inplanes, planes * self.expansion, kernel_size=1, stride=stride, bias=False),
@@ -44,8 +47,7 @@ class ResidualBlock(nn.Module):
             else :
                 self.downsample = None
 
-        self.kernel_size = kernel_size
-        self.stride = stride
+        self.act_f = nn.ReLU(inplace=True)
 
     def forward(self, x, **kwargs):
         residual = x
@@ -56,7 +58,7 @@ class ResidualBlock(nn.Module):
         out = self.conv2(out)
         out = self.norm2(out)
 
-        if self.flag_res == True:
+        if self.flag_res:
             ## downsample the residual
             if self.downsample is not None:
                 residual = self.downsample(residual)
@@ -68,9 +70,10 @@ class ResidualBlock(nn.Module):
         return out
     
 
-class model(nn.Module):
-    def __init__(self, in_planes, f_maps=32, num_levels=4, num_channels=37, out_channels=4, **kwargs):
-        super(model, self).__init__()
+class RailModel(nn.Module):
+    def __init__(self, in_planes, f_maps=32, num_levels=4,
+                 num_channels=37, out_channels=4, **kwargs):
+        super(RailModel, self).__init__()
 
         if isinstance(f_maps, int):
             f_maps = [f_maps * 2 ** k for k in range(num_levels)]  # number_of_features_per_level
@@ -81,9 +84,13 @@ class model(nn.Module):
         self.inplanes = in_planes
         self.num_channels = num_channels
         self.out_channels = out_channels
+        
+        # TODO: This is tot done yet
+        self.yaw_embedding = nn.Embedding(num_embeddings=len(C.YAW_TYPES),
+                                          embedding_dim=in_planes)
 
         # embedding 
-        self.embedding = nn.Sequential(
+        self.rail_embedding = nn.Sequential(
             nn.Conv2d(1, in_planes, kernel_size=(1, 5), stride=(1, 1), padding=(0, 2), padding_mode='replicate', dilation=1, groups=1, bias=False),
             nn.InstanceNorm3d(in_planes, affine=False),
             nn.ReLU(),
@@ -93,17 +100,13 @@ class model(nn.Module):
         dynamic_layers = []
         cross_channel_layers = []
         for idx, f in enumerate(f_maps):
-            if idx == 0:
-                dynamic_layers.append(ResidualBlock(inplanes=self.inplanes, planes=f, kernel_size=(1, 5), stride=(1, 1), 
-                                                    dilation=1, padding=(0, 2), flag_res=True))
-            else:
-                dynamic_layers.append(ResidualBlock(inplanes=self.inplanes, planes=f, kernel_size=(1, 5), stride=(1, 2), 
-                                                    dilation=1, padding=(0, 2), flag_res=True))
-            cross_channel_layers.append(
-                ResidualBlock(inplanes=f, planes=f, kernel_size=(num_channels, 1), stride=1, dilation=1, 
-                              padding=0, flag_res=True))
+            dynamic_layers.append(ResidualBlock(inplanes=2 * self.inplanes, planes=f, kernel_size=(1, 5),
+                                                stride=(1, 1) if idx == 0 else (1, 2), 
+                                                dilation=1, padding=(0, 2), flag_res=True))
+            cross_channel_layers.append(ResidualBlock(inplanes=f, planes=f, kernel_size=(num_channels, 1),
+                                                      stride=1, dilation=1, padding=0, flag_res=True))
             self.inplanes = f
-        
+
         self.time_encoder = nn.ModuleList(dynamic_layers)
         self.channel_encoder = nn.ModuleList(cross_channel_layers)
 
@@ -121,9 +124,13 @@ class model(nn.Module):
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
                     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor, yaw: torch.Tensor = None):
         # embedding
-        x = self.embedding(x)  # B, 16, 37, 2500
+        x = self.rail_embedding(x)  # B, 16, 37, 2500
+        if yaw is not None:
+            # FIXME: this code will NOT operate due to tensor dimension issue
+            yaw = self.yaw_embedding(yaw)
+            x = torch.concat(tensors=[x, yaw], dim=1)
 
         # encoder part
         c_encoders_features = []
@@ -139,5 +146,4 @@ class model(nn.Module):
             x_c = decoder(encoder_feature, x_c)
 
         x_c = self.final_conv(x_c)
-        
         return x_c
