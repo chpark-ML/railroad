@@ -193,7 +193,7 @@ class Trainer():
         super().train_epoch(epoch, train_loader)
         train_losses = []
         start = time.time()
-
+        breakpoint()
         train_loader.dataset.shuffle()
         for i, data in enumerate(train_loader):
             self.optimizer.zero_grad()
