@@ -386,6 +386,17 @@ class Trainer():
 
         return best_model_metrics
     
+    def test(self, loaders):
+        # Test the checkpoints
+        if os.path.exists(self.path_best_model):
+            self.load_checkpoint(self.path_best_model)
+        else:
+            logger.info(
+                'The best model path has never been updated, initial model has been used for testing.')
+
+        if RunMode.TEST in loaders:
+            best_model_test_metrics = self.test_epoch(self.epoch_best_model, loaders[RunMode.TEST])
+            self.log_metrics('checkpoint_test', None, best_model_test_metrics)
 
     def log_metrics(self, run_mode_str: str, step, metrics: object, log_prefix='', mlflow_log_prefix='', duration=None):
         """ Log the metrics to logger and to mlflow if mlflow is used. Metrics could be None if learning isn't
