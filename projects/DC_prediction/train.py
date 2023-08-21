@@ -311,6 +311,7 @@ class Trainer():
         }
         if self.use_amp:
             checkpoint['scaler'] = self.scaler.state_dict()
+        torch.save(checkpoint, model_path)
 
     def _run_epoch(self, epoch, train_loader, val_loader, test_loader, best_model_metrics: object):
         self.epoch = epoch
