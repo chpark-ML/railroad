@@ -12,4 +12,4 @@ HYDRA_FULL_ERROR=1 python3 main.py \
   loader.batch_size=${BS} \
   trainer.max_epoch=${epoch} \
   trainer.gpus=${gpu_num} \
-  trainer.fast_dev_run=True
+  trainer.fast_dev_run=False
