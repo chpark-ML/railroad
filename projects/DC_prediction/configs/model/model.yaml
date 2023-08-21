@@ -3,4 +3,5 @@ _target_: projects.DC_prediction.models.model.model
 in_planes: 16
 f_maps: 32
 num_levels: 4
-num_channels: 32
+num_channels: 37
+out_channels: 4

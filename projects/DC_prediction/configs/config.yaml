@@ -2,7 +2,7 @@
 experiment_tool:
   name: mlflow
   enable: True
-  server_uri: http://172.31.10.111:18002
+  server_uri: http://127.0.0.1:5000
   run_name: null
   experiment_name: null
 
@@ -33,3 +33,6 @@ debug: False
 
 # pretty print config at the start of the run using Rich library
 print_config: True
+
+# evaluate best checkpoint on a test dataloader if exists
+eval_best_ckpt: True

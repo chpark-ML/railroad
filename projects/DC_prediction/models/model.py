@@ -11,7 +11,7 @@ class FusionBlock(nn.Module):
         self.act_f = nn.ReLU(inplace=True)
 
     def forward(self, x_low, x_high, **kwargs):
-        x_high = F.interpolate(x_high, scale_factor=2)
+        x_high = F.interpolate(x_high, size=(x_low.size()[-2:]))
         x_concat = torch.cat([x_low, x_high], dim=1)
         x_concat = self.conv(x_concat)
         x_concat = self.norm(x_concat)
@@ -69,7 +69,7 @@ class ResidualBlock(nn.Module):
     
 
 class model(nn.Module):
-    def __init__(self, in_planes, f_maps=32, num_levels=4, num_channels=32, **kwargs):
+    def __init__(self, in_planes, f_maps=32, num_levels=4, num_channels=37, out_channels=4, **kwargs):
         super(model, self).__init__()
 
         if isinstance(f_maps, int):
@@ -80,9 +80,10 @@ class model(nn.Module):
 
         self.inplanes = in_planes
         self.num_channels = num_channels
+        self.out_channels = out_channels
 
         # embedding 
-        self.conv1 = nn.Sequential(
+        self.embedding = nn.Sequential(
             nn.Conv2d(1, in_planes, kernel_size=(1, 5), stride=(1, 1), padding=(0, 2), padding_mode='replicate', dilation=1, groups=1, bias=False),
             nn.InstanceNorm3d(in_planes, affine=False),
             nn.ReLU(),
@@ -91,12 +92,15 @@ class model(nn.Module):
         # create layers encoders
         dynamic_layers = []
         cross_channel_layers = []
-        for f in f_maps:
-            dynamic_layers.append(
-                ResidualBlock(inplanes=self.inplanes, planes=f, kernel_size=(1, 5), stride=2, dilation=1, 
-                              padding=(0, 2), flag_res=True))
+        for idx, f in enumerate(f_maps):
+            if idx == 0:
+                dynamic_layers.append(ResidualBlock(inplanes=self.inplanes, planes=f, kernel_size=(1, 5), stride=(1, 1), 
+                                                    dilation=1, padding=(0, 2), flag_res=True))
+            else:
+                dynamic_layers.append(ResidualBlock(inplanes=self.inplanes, planes=f, kernel_size=(1, 5), stride=(1, 2), 
+                                                    dilation=1, padding=(0, 2), flag_res=True))
             cross_channel_layers.append(
-                ResidualBlock(inplanes=f, planes=f, kernel_size=(num_channels, 1), stride=2, dilation=1, 
+                ResidualBlock(inplanes=f, planes=f, kernel_size=(num_channels, 1), stride=1, dilation=1, 
                               padding=0, flag_res=True))
             self.inplanes = f
         
@@ -105,11 +109,11 @@ class model(nn.Module):
 
         # create decoders
         fusion_layers = []
-        r_f_maps = f_maps[::-1]
+        r_f_maps = [f // self.out_channels for f in f_maps[::-1]]
         for f_l, f_h in zip(r_f_maps[1:], r_f_maps[:-1]):
             fusion_layers.append(FusionBlock(f_l + f_h, f_l))
         self.decoders = nn.ModuleList(fusion_layers)
-        self.final_conv = nn.Conv2d(f_maps[-1], 1, kernel_size=1, stride=1, padding=0, bias=True)
+        self.final_conv = nn.Conv2d(f_maps[0] // self.out_channels, 1, kernel_size=1, stride=1, padding=0, bias=True)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -118,25 +122,22 @@ class model(nn.Module):
                     nn.init.constant_(m.bias, 0)
                     
     def forward(self, x):
+        # embedding
+        x = self.embedding(x)  # B, 16, 37, 2500
+
         # encoder part
         c_encoders_features = []
         for t_encoder, c_encoder in zip(self.time_encoder, self.channel_encoder):
-            x = t_encoder(x)  # B, f, c, t'
-            x = c_encoder (x)  # B, f * 4, 1, t'
-            x.view(x.shape[0], x.shape[1] // 4, 4, x.shape[3])  # B, f, 4, t'
-            # reverse the encoder outputs to be aligned with the decoder
-            c_encoders_features.insert(0, x)
-
-        # remove the last encoder's output from the list
-        # !!remember: it's the 1st in the list
+            x = t_encoder(x)  # B, 32, 37, 1250
+            x_c = c_encoder(x)  # B, 32, 1, 1250
+            x_c = x_c.view(x_c.shape[0], x_c.shape[1] // self.out_channels, self.out_channels, x_c.shape[3])
+            c_encoders_features.insert(0, x_c)
         c_encoders_features = c_encoders_features[1:]
 
         # decoder part
-        for decoder, encoder_features in zip(self.decoders, c_encoders_features):
-            # pass the output from the corresponding encoder and the output
-            # of the previous decoder
-            x = decoder(encoder_features, x)
+        for decoder, encoder_feature in zip(self.decoders, c_encoders_features):
+            x_c = decoder(encoder_feature, x_c)
 
-        x = self.final_conv(x)
-
-        return x
+        x_c = self.final_conv(x_c)
+        
+        return x_c

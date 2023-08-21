@@ -1,6 +1,6 @@
 name: mlflow
 enable: True
-server_uri: 
+server_uri: http://127.0.0.1:5000
 experiment_name: railroad
 run_group: default
 run_name: test
