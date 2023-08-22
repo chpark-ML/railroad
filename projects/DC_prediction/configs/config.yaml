@@ -10,7 +10,7 @@ experiment_tool:
 defaults:
   - trainer: default
   - loader: default
-  - criterion: mse
+  - criterion: mape
   - model: model
   - optim: adamw
   - scheduler: one_cycle_lr
