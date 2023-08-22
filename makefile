@@ -63,6 +63,8 @@ ${ENV_FILE_PATH}:
 env: ${ENV_FILE_PATH}
 
 # mlflow 
+pull-mlflow:
+	docker pull ghcr.io/mlflow/mlflow:v2.0.1
 up-mlflow:
 	docker run -p 5000:5000 --name mlflow-server -d -v ${CURRENT_PATH}:/mlflow ghcr.io/mlflow/mlflow:v2.3.0 mlflow server --host 0.0.0.0
 down-mlflow:

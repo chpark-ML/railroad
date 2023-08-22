@@ -135,12 +135,13 @@ class RailroadDataset(Dataset):
         elem = self.df_index.iloc[index]
     
         sd = elem['start_distance']
-        if self.interval is not None:
+        if self.interval is not None and self.mode == RunMode.TRAIN:
             # Add stochasticity to starting distance.
             # This should be controlled by another parameter, instead of directly using `interval`
             # TODO: results in different tensor size across the batch sample.
-            w = max(1, int(self.interval * 0.05))
-            sd += np.random.randint(low=-w, high=w)
+            max_shift_size = int(self.interval * 1.0)
+            sd += np.random.randint(low=0, high=max_shift_size)
+            sd = max(sd, self.df_index['start_distance'].max())
         rail = elem['rail_type']
         yaw = elem['yaw_type']
         data = self.df_data[rail][yaw]
