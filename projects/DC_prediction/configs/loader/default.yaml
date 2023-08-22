@@ -7,7 +7,7 @@ dataset:
   window_length: 2500
   history_length: 500
   rail_type: curved
-  interval: 
+  interval: 30
 
 batch_size: 4
 num_workers: 4
