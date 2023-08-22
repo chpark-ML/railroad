@@ -267,8 +267,8 @@ class Trainer():
                 # FIXME: progress bar does not update when 'fast_dev_run==True'
                 break
 
-        preds = torch.vstack(list_logits).squeeze()
-        annots = torch.vstack(list_annots).squeeze()
+        preds = torch.vstack(list_logits)
+        annots = torch.vstack(list_annots)
 
         return preds, annots
 
