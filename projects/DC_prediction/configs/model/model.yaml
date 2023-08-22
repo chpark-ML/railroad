@@ -3,5 +3,5 @@ _target_: projects.DC_prediction.models.model.RailModel
 in_planes: 16
 f_maps: 32
 num_levels: 4
-num_channels: 37
+rail_type: ${loader.dataset.rail_type}
 out_channels: 4

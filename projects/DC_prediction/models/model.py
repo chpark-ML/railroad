@@ -72,7 +72,7 @@ class ResidualBlock(nn.Module):
 
 class RailModel(nn.Module):
     def __init__(self, in_planes, f_maps=32, num_levels=4,
-                 num_channels=37, out_channels=4, **kwargs):
+                 rail_type="curved", out_channels=4, **kwargs):
         super(RailModel, self).__init__()
 
         if isinstance(f_maps, int):
@@ -82,7 +82,7 @@ class RailModel(nn.Module):
         assert len(f_maps) > 1, "Required at least 2 levels in the U-Net"
 
         self.inplanes = in_planes
-        self.num_channels = num_channels
+        self.num_channels = C.NUM_CHANNEL_MAPPER[rail_type]
         self.out_channels = out_channels
         
         # TODO: This is tot done yet
@@ -104,7 +104,7 @@ class RailModel(nn.Module):
                                                 planes=f, kernel_size=(1, 5),
                                                 stride=(1, 1) if idx == 0 else (1, 2), 
                                                 dilation=1, padding=(0, 2), flag_res=True))
-            cross_channel_layers.append(ResidualBlock(inplanes=f, planes=f, kernel_size=(num_channels, 1),
+            cross_channel_layers.append(ResidualBlock(inplanes=f, planes=f, kernel_size=(self.num_channels, 1),
                                                       stride=1, dilation=1, padding=0, flag_res=True))
             self.inplanes = f
 
