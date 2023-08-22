@@ -23,7 +23,7 @@ run_modes:
 
 hydra:
   run:
-    dir: ./outputs/cls/${experiment_tool.run_group}/${experiment_tool.run_name}/${now:%Y-%m-%d_%H-%M-%S}
+    dir: ./outputs/${experiment_tool.run_group}/${experiment_tool.run_name}/${now:%Y-%m-%d_%H-%M-%S}
   job:
     chdir: True  # keep hydra = 1.1 change directory behavior
 

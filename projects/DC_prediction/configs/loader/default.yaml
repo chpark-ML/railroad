@@ -10,7 +10,7 @@ dataset:
   interval: 50
 
 batch_size: 4
-num_workers: 0
+num_workers: 4
 pin_memory: True
 prefetch_factor: 2
 drop_last: False
