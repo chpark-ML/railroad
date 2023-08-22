@@ -128,7 +128,7 @@ class RailroadDataset(Dataset):
     def __len__(self):
         return len(self.df_index)
     
-    def __getitem__(self, index: int) -> Dict[str, np.ndarray | int]:
+    def __getitem__(self, index: int) -> Dict[str, Union[np.ndarray, int]]:
         """
         Resize -> Windowing -> Additional data augmentation
         """
@@ -144,13 +144,13 @@ class RailroadDataset(Dataset):
         yaw = elem['yaw_type']
         data = self.df_data[rail][yaw]
 
-        x = data.loc[sd : sd+self.window_length-1].to_numpy(copy=True)
-        y = data.loc[sd : sd+self.window_length-1].loc[:, C.PREDICT_COLS].to_numpy(copy=True)
+        x = data.loc[sd : sd+self.window_length-1].copy()
+        y = data.loc[sd : sd+self.window_length-1].loc[:, C.PREDICT_COLS].copy()
         for col in C.PREDICT_COLS:
             x.loc[self.history_length:, col] = 0
 
-        x = np.transpose(np.expand_dims(x, axis=(0)), axes=(0, 2, 1)) # (1, channel, time)
-        y = np.transpose(np.expand_dims(y, axis=(0)), axes=(0, 2, 1)) # (1, 4, time)
+        x = np.transpose(np.expand_dims(x.values, axis=(0)), axes=(0, 2, 1)) # (1, channel, time)
+        y = np.transpose(np.expand_dims(y.values, axis=(0)), axes=(0, 2, 1)) # (1, 4, time)
         # Data augmentation
         if self.mode == RunMode.TRAIN:
             x = self.transform(x)
