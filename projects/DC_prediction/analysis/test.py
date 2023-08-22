@@ -59,8 +59,8 @@ def main(config: omegaconf.DictConfig) -> None:
 
     # curved 
     ckpts = {
-        'curved': '/opt/railroad/projects/DC_prediction/outputs/baseline/baseline-interval10/2023-08-22_12-42-18/model.pth',
-        'straight': '/opt/railroad/projects/DC_prediction/outputs/baseline/baseline-interval10/2023-08-22_12-42-18/model.pth'
+        'curved': '/opt/railroad/projects/DC_prediction/outputs/baseline/baseline-interval5-curved/2023-08-22_16-36-49/model.pth',
+        'straight': '/opt/railroad/projects/DC_prediction/outputs/baseline/baseline-interval5-straight/2023-08-22_16-45-43/model.pth'
     }
     for rail in C.RAIL_TYPES:
         config.loader.dataset.rail_type=rail
@@ -90,11 +90,8 @@ def main(config: omegaconf.DictConfig) -> None:
             for yaw in C.YAW_TYPES:
                 target_col = f'{col}_{rail[0]}{yaw}'
                 df_ans.loc[:, target_col] = preds[C.YAW_MAPPER[yaw], C.PREDICT_COL_MAPPER[col], -len(df_ans):].detach().cpu().numpy()
-
-        # straight model should be trained.
-        break
     
-    df_ans.to_csv('result.csv', index=False)
+    df_ans.to_csv('/opt/railroad/projects/DC_prediction/analysis/result.csv', index=False)
 
 if __name__ == '__main__':
     main()
