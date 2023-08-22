@@ -138,6 +138,7 @@ class RailroadDataset(Dataset):
         if self.interval is not None:
             # Add stochasticity to starting distance.
             # This should be controlled by another parameter, instead of directly using `interval`
+            # TODO: results in different tensor size across the batch sample.
             w = max(1, int(self.interval * 0.05))
             sd += np.random.randint(low=-w, high=w)
         rail = elem['rail_type']
