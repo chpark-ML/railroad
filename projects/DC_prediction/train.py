@@ -183,12 +183,13 @@ class Trainer():
             self.optimizer.zero_grad()
             x = data['x'].to(self.device)
             y = data['y'].to(self.device)
+            yaw = data['yaw'].to(self.device)
             _check_any_nan(x)
             _check_any_nan(y)
 
             # forward propagation
             with torch.autocast(device_type=self.device.type, enabled=self.use_amp):
-                logits = self.model(x)
+                logits = self.model(x, yaw)
                 loss = self.criterion(logits, y)
                 train_losses.append(loss.detach())
 
@@ -253,8 +254,9 @@ class Trainer():
         for data in tqdm.tqdm(loader):
             x = data['x'].to(self.device)
             y = data['y'].to(self.device)
+            yaw = data['yaw'].to(self.device)
             _check_any_nan(x)
-            logits = self.model(x)
+            logits = self.model(x, yaw)
 
             list_logits.append(logits)
             list_annots.append(y)
