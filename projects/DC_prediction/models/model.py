@@ -1,3 +1,5 @@
+import math 
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -5,12 +7,33 @@ import torch.nn.functional as F
 import projects.DC_prediction.utils.constants as C
 
 
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_seq_len=512):
+        super(PositionalEncoding, self).__init__()
+        self.d_model = d_model
+        self.max_seq_len = max_seq_len
+        self.positional_encoding = self.generate_positional_encoding()
+
+    def generate_positional_encoding(self):
+        pe = torch.zeros(self.max_seq_len, self.d_model)
+        position = torch.arange(0, self.max_seq_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, self.d_model, 2).float() * (-math.log(10000.0) / self.d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        return pe.unsqueeze(0)  # Add batch dimension
+
+    def forward(self, x):
+        # Add positional encoding to the input tensor
+        x = x + self.positional_encoding[:, :x.size(-1), :].permute(0, 2, 1).unsqueeze(2).to(x.device)
+        return x
+    
+
 class FusionBlock(nn.Module):
     def __init__(self, inplanes, planes, kernel_size=1, stride=1, padding=0):
         super(FusionBlock, self).__init__()
         self.conv = nn.Conv2d(inplanes, planes, kernel_size=kernel_size, stride=stride, padding=padding, padding_mode='replicate', bias=False)
-        self.norm = nn.InstanceNorm2d(planes, affine=False)
-        self.act_f = nn.ReLU(inplace=True)
+        self.norm = nn.BatchNorm2d(planes, affine=True)
+        self.act_f = nn.GELU()
 
     def forward(self, x_low, x_high, **kwargs):
         x_high = F.interpolate(x_high, size=(x_low.size()[-2:]))
@@ -31,23 +54,23 @@ class ResidualBlock(nn.Module):
         self.conv1 = nn.Conv2d(inplanes, planes,
                                kernel_size=kernel_size, stride=stride, padding=padding,
                                padding_mode='replicate', bias=False)
-        self.norm1 = nn.InstanceNorm2d(planes, affine=False)
+        self.norm1 = nn.BatchNorm2d(planes, affine=True)
 
         self.conv2 = nn.Conv2d(planes, planes,
                                kernel_size=1, stride=1, padding=0,
                                padding_mode='replicate', bias=False)
-        self.norm2 = nn.InstanceNorm2d(planes, affine=False)
+        self.norm2 = nn.BatchNorm2d(planes, affine=True)
 
         if self.flag_res:
             if stride != 1 or inplanes != planes * self.expansion :
                 self.downsample = nn.Sequential(
                         nn.Conv2d(inplanes, planes * self.expansion, kernel_size=1, stride=stride, bias=False),
-                        nn.InstanceNorm2d(planes * self.expansion, affine=False),
+                        nn.BatchNorm2d(planes * self.expansion, affine=True),
                     )
             else :
                 self.downsample = None
 
-        self.act_f = nn.ReLU(inplace=True)
+        self.act_f = nn.GELU()
 
     def forward(self, x, **kwargs):
         residual = x
@@ -72,7 +95,7 @@ class ResidualBlock(nn.Module):
 
 class RailModel(nn.Module):
     def __init__(self, in_planes, f_maps=32, num_levels=4,
-                 rail_type="curved", out_channels=4, **kwargs):
+                 rail_type="curved", window_length=2500, out_channels=4, **kwargs):
         super(RailModel, self).__init__()
 
         if isinstance(f_maps, int):
@@ -83,17 +106,20 @@ class RailModel(nn.Module):
 
         self.inplanes = in_planes
         self.num_channels = C.NUM_CHANNEL_MAPPER[rail_type]
+        self.window_length = window_length
         self.out_channels = out_channels
         
         # TODO: This is tot done yet
         self.yaw_embedding = nn.Embedding(num_embeddings=len(C.YAW_TYPES),
                                           embedding_dim=in_planes)
 
+        self.pos_enc = PositionalEncoding(d_model=in_planes * 2, max_seq_len=self.window_length)
+
         # embedding 
         self.rail_embedding = nn.Sequential(
             nn.Conv2d(1, in_planes, kernel_size=(1, 5), stride=(1, 1), padding=(0, 2), padding_mode='replicate', dilation=1, groups=1, bias=False),
-            nn.InstanceNorm3d(in_planes, affine=False),
-            nn.ReLU(),
+            nn.BatchNorm2d(in_planes, affine=True),
+            nn.GELU(),
         )
 
         # create layers encoders
@@ -121,7 +147,7 @@ class RailModel(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+                nn.init.xavier_normal_(m.weight)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
                     
@@ -134,6 +160,9 @@ class RailModel(nn.Module):
             yaw = yaw.unsqueeze(2).unsqueeze(3).repeat((1, 1, x.size()[-2], x.size()[-1]))
             x = torch.concat(tensors=[x, yaw], dim=1)
         
+        # positional encoding
+        x = self.pos_enc(x)
+
         # encoder part
         c_encoders_features = []
         for t_encoder, c_encoder in zip(self.time_encoder, self.channel_encoder):

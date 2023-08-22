@@ -4,4 +4,5 @@ in_planes: 16
 f_maps: 32
 num_levels: 4
 rail_type: ${loader.dataset.rail_type}
+window_length: ${loader.dataset.window_length}
 out_channels: 4
