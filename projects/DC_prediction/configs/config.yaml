@@ -2,7 +2,7 @@
 experiment_tool:
   name: mlflow
   enable: True
-  server_uri: http://127.0.0.1:5000
+  server_uri: http://14.36.254.3:5000
   run_name: null
   experiment_name: null
 

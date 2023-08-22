@@ -62,6 +62,12 @@ ${ENV_FILE_PATH}:
 # env  
 env: ${ENV_FILE_PATH}
 
+# mlflow 
+up-mlflow:
+	docker run -p 5000:5000 --name mlflow-server -d -v ${CURRENT_PATH}:/mlflow ghcr.io/mlflow/mlflow:v2.3.0 mlflow server --host 0.0.0.0
+down-mlflow:
+	docker rm -f mlflow-server
+
 # base docker 
 build-base:
 	COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 docker compose -f ${DOCKER_BUILD_CONTEXT_PATH}/${DOCKER_COMPOSE_NAME} up --build -d ${SERVICE_NAME_BASE}

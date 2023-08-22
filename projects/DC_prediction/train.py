@@ -315,6 +315,19 @@ class Trainer():
             checkpoint['scaler'] = self.scaler.state_dict()
         torch.save(checkpoint, model_path)
 
+    def load_checkpoint(self, model_path):
+        """Loads checkpoint from directory"""
+        assert os.path.exists(model_path)
+
+        checkpoint = torch.load(model_path, map_location=self.device)
+        self.model.load_state_dict(checkpoint['model'], strict=True)
+        logger.info(f'Model loaded from {model_path}')
+
+        if 'optimizer' in checkpoint:
+            self.optimizer.load_state_dict(checkpoint['optimizer'])
+        if 'scaler' in checkpoint:
+            self.scaler.load_state_dict(checkpoint['scaler'])
+            
     def _run_epoch(self, epoch, train_loader, val_loader, test_loader, best_model_metrics: object):
         self.epoch = epoch
 
