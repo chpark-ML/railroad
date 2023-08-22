@@ -16,3 +16,5 @@ LANE_DATA_STRAIGHT = DATA_ROOT_PATH / "lane_data_s.csv"
 
 VIBRATION_DATA_CURVED = sorted(DATA_ROOT_PATH.rglob("*data_c*0.csv"))
 LANE_DATA_CURVED = DATA_ROOT_PATH / "lane_data_c.csv"
+
+ANSWER_SAMPLE = DATA_ROOT_PATH / "answer_sample.csv"
