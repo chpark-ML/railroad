@@ -14,7 +14,11 @@ class WeightedMAPE(nn.Module):
         # logits, annots > (B, 1, 4, 2500)
         logits = logits[:, :, :, -self.pred_length:]
         annots = annots[:, :, :, -self.pred_length:]
+        
         weights = self.weights.type_as(logits.data)
-        loss = (torch.abs(logits - annots) * weights / torch.abs(annots)).sum(dim=(-2, -1)) / self.pred_length * 100
-
-        return loss.mean()
+        abs_errors = torch.abs(logits - annots)
+        percentage_errors = abs_errors / torch.abs(annots).clamp(min=1e-4)
+        weighted_erros = weights * percentage_errors
+        
+        loss = torch.mean(weighted_erros)
+        return loss
