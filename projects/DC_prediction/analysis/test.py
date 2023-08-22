@@ -83,11 +83,18 @@ def main(config: omegaconf.DictConfig) -> None:
         loaders = {mode: hydra.utils.instantiate(config.loader,
                                                     dataset={'mode': mode}, shuffle=(mode == RunMode.TRAIN),
                                                     drop_last=(mode == RunMode.TRAIN)) for mode in run_modes}
-        preds, _ = _inference(model, loaders[RunMode.TEST], device)
+        preds, _ = _inference(model, loaders[RunMode.TEST], device)  # (B, 4, 2500)
         
-        #TODO: answer sample에 넣기
+        # TODO... check if index is correct...
+        for col in C.PREDICT_COLS:
+            for yaw in C.YAW_TYPES:
+                target_col = f'{col}_{rail[0]}{yaw}'
+                df_ans.loc[:, target_col] = preds[C.YAW_MAPPER[yaw], C.PREDICT_COL_MAPPER[col], -len(df_ans):].detach().cpu().numpy()
 
+        # straight model should be trained.
+        break
     
+    df_ans.to_csv('result.csv', index=False)
 
 if __name__ == '__main__':
     main()
