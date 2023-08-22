@@ -100,7 +100,8 @@ class RailModel(nn.Module):
         dynamic_layers = []
         cross_channel_layers = []
         for idx, f in enumerate(f_maps):
-            dynamic_layers.append(ResidualBlock(inplanes=2 * self.inplanes, planes=f, kernel_size=(1, 5),
+            dynamic_layers.append(ResidualBlock(inplanes=2 * self.inplanes if idx == 0 else self.inplanes, 
+                                                planes=f, kernel_size=(1, 5),
                                                 stride=(1, 1) if idx == 0 else (1, 2), 
                                                 dilation=1, padding=(0, 2), flag_res=True))
             cross_channel_layers.append(ResidualBlock(inplanes=f, planes=f, kernel_size=(num_channels, 1),
@@ -130,8 +131,9 @@ class RailModel(nn.Module):
         if yaw is not None:
             # FIXME: this code will NOT operate due to tensor dimension issue
             yaw = self.yaw_embedding(yaw)
+            yaw = yaw.unsqueeze(2).unsqueeze(3).repeat((1, 1, x.size()[-2], x.size()[-1]))
             x = torch.concat(tensors=[x, yaw], dim=1)
-
+        
         # encoder part
         c_encoders_features = []
         for t_encoder, c_encoder in zip(self.time_encoder, self.channel_encoder):
