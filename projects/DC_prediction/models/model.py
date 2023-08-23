@@ -44,6 +44,44 @@ class FusionBlock(nn.Module):
         return x_concat
 
 
+class Block(nn.Module):
+    r""" ConvNeXt Block. There are two equivalent implementations:
+    (1) DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)
+    (2) DwConv -> Permute to (N, H, W, C); LayerNorm (channels_last) -> Linear -> GELU -> Linear; Permute back
+    We use (2) as we find it slightly faster in PyTorch
+    
+    Args:
+        dim (int): Number of input channels.
+        drop_path (float): Stochastic depth rate. Default: 0.0
+        layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
+    """
+    def __init__(self, inplanes, planes, kernel_size=5, stride=1, dilation=1, padding=0, drop_path=0., layer_scale_init_value=1e-6):
+        super().__init__()
+        self.dwconv = nn.Conv2d(inplanes, inplanes, kernel_size=7, padding=3, groups=inplanes) # depthwise conv
+        self.norm = nn.LayerNorm(dim, eps=1e-6)
+        self.pwconv1 = nn.Linear(inplanes, planes) # pointwise/1x1 convs, implemented with linear layers
+        self.act = nn.GELU()
+        self.pwconv2 = nn.Linear(planes, inplanes)
+        self.gamma = nn.Parameter(layer_scale_init_value * torch.ones((inplanes)), 
+                                    requires_grad=True) if layer_scale_init_value > 0 else None
+        self.drop_path = nn.Identity()
+
+    def forward(self, x):
+        input = x
+        x = self.dwconv(x)
+        x = x.permute(0, 2, 3, 1) # (N, C, H, W) -> (N, H, W, C)
+        x = self.norm(x)
+        x = self.pwconv1(x)
+        x = self.act(x)
+        x = self.pwconv2(x)
+        if self.gamma is not None:
+            x = self.gamma * x
+        x = x.permute(0, 3, 1, 2) # (N, H, W, C) -> (N, C, H, W)
+
+        x = input + self.drop_path(x)
+        return x
+
+        
 class ResidualBlock(nn.Module):
     expansion = 1
     def __init__(self, inplanes, planes, kernel_size=5, stride=1, dilation=1, padding=0, flag_res=True):
@@ -54,18 +92,20 @@ class ResidualBlock(nn.Module):
         self.conv1 = nn.Conv2d(inplanes, planes,
                                kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation,
                                padding_mode='zeros', bias=False)
-        self.norm1 = nn.BatchNorm2d(planes, affine=True)
+        # self.norm1 = nn.BatchNorm2d(planes, affine=True)
+        self.norm1 = nn.LayerNorm(planes, eps=1e-6)
 
         self.conv2 = nn.Conv2d(planes, planes,
                                kernel_size=1, stride=1, padding=0,
                                padding_mode='zeros', bias=False)
-        self.norm2 = nn.BatchNorm2d(planes, affine=True)
+        # self.norm2 = nn.BatchNorm2d(planes, affine=True)
+        self.norm2 = nn.LayerNorm(planes, eps=1e-6)
 
         if self.flag_res:
             if stride != 1 or inplanes != planes * self.expansion :
                 self.downsample = nn.Sequential(
-                        nn.Conv2d(inplanes, planes * self.expansion, kernel_size=1, stride=stride, bias=False),
-                        nn.BatchNorm2d(planes * self.expansion, affine=True),
+                        nn.Linear(inplanes, planes * self.expansion),
+                        nn.LayerNorm(planes * self.expansion, eps=1e-6)
                     )
             else :
                 self.downsample = None
@@ -75,16 +115,22 @@ class ResidualBlock(nn.Module):
     def forward(self, x, **kwargs):
         residual = x
         out = self.conv1(x)
+        out = out.permute(0, 2, 3, 1)
         out = self.norm1(out)
+        out = out.permute(0, 3, 1, 2)
         out = self.act_f(out)
 
         out = self.conv2(out)
+        out = out.permute(0, 2, 3, 1)
         out = self.norm2(out)
+        out = out.permute(0, 3, 1, 2)
 
         if self.flag_res:
             ## downsample the residual
             if self.downsample is not None:
+                residual = residual.permute(0, 2, 3, 1)
                 residual = self.downsample(residual)
+                residual = residual.permute(0, 3, 1, 2)
 
             ## crop and residual connection
             out += residual[:, :, :out.size()[-2], :out.size()[-1]]
@@ -117,11 +163,7 @@ class RailModel(nn.Module):
         self.pos_enc = PositionalEncoding(d_model=in_planes * 2, max_seq_len=self.window_length)
 
         # embedding 
-        self.rail_embedding = nn.Sequential(
-            nn.Conv2d(1, in_planes, kernel_size=(1, kernel), stride=(1, 1), padding=(0, kernel//2), padding_mode='zeros', dilation=1, groups=1, bias=False),
-            nn.BatchNorm2d(in_planes, affine=True),
-            nn.GELU(),
-        )
+        self.rail_embedding = nn.Conv2d(1, in_planes, kernel_size=(1, kernel), stride=(1, 1), padding=(0, kernel//2), padding_mode='zeros', dilation=1, groups=1, bias=False)
 
         # create layers encoders
         dynamic_layers = []
@@ -133,7 +175,6 @@ class RailModel(nn.Module):
                                                 dilation=(1, dilation), padding=(0, kernel//2 * dilation), flag_res=True))
             cross_channel_layers.append(nn.Sequential(
                 ResidualBlock(inplanes=f, planes=f * self.out_channels, kernel_size=(self.num_channels, 1), stride=1, dilation=1, padding=0, flag_res=True),
-                ResidualBlock(inplanes=f * self.out_channels, planes=f * self.out_channels, kernel_size=(1, 1), stride=1, dilation=1, padding=0, flag_res=True),
             ))
             self.inplanes = f
 
@@ -155,10 +196,7 @@ class RailModel(nn.Module):
             nn.Conv2d(50, 30, kernel_size=1, stride=1, padding=0, bias=True),
             nn.Dropout2d(p=drop_p),
             nn.Sigmoid(),
-            nn.Conv2d(30, 15, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.Dropout2d(p=drop_p),
-            nn.Sigmoid(),
-            nn.Conv2d(15, 1, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.Conv2d(30, 1, kernel_size=1, stride=1, padding=0, bias=True),
         )
 
         for m in self.modules():
