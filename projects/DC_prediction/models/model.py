@@ -132,8 +132,8 @@ class RailModel(nn.Module):
                                                 stride=(1, 1) if idx == 0 else (1, kernel//2), 
                                                 dilation=(1, dilation), padding=(0, kernel//2 * dilation), flag_res=True))
             cross_channel_layers.append(nn.Sequential(
-                ResidualBlock(inplanes=f, planes=f, kernel_size=(self.num_channels, 1), stride=1, dilation=1, padding=0, flag_res=True),
-                ResidualBlock(inplanes=f, planes=f * self.out_channels, kernel_size=(1, 1), stride=1, dilation=1, padding=0, flag_res=True),
+                ResidualBlock(inplanes=f, planes=f * self.out_channels, kernel_size=(self.num_channels, 1), stride=1, dilation=1, padding=0, flag_res=True),
+                ResidualBlock(inplanes=f * self.out_channels, planes=f * self.out_channels, kernel_size=(1, 1), stride=1, dilation=1, padding=0, flag_res=True),
             ))
             self.inplanes = f
 
