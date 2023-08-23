@@ -6,7 +6,7 @@ epoch=200
 BS=4
 interval=50
 
-rail_type=straight
+rail_type=both
 val_type=pre
 window_length=2500
 history_length=500
