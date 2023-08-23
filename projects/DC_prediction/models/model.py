@@ -105,6 +105,7 @@ class RailModel(nn.Module):
         assert len(f_maps) > 1, "Required at least 2 levels in the U-Net"
 
         self.inplanes = in_planes
+        self.rail_type = rail_type
         self.num_channels = C.NUM_CHANNEL_MAPPER[rail_type]
         self.window_length = window_length
         self.out_channels = out_channels
@@ -153,22 +154,22 @@ class RailModel(nn.Module):
                     
     def forward(self, x: torch.Tensor, yaw: torch.Tensor = None):
         # embedding
-        x = self.rail_embedding(x)  # B, 16, 37, 2500
+        x = self.rail_embedding(x)  # B, 16, C, 2500
         if yaw is not None:
             # FIXME: this code will NOT operate due to tensor dimension issue
             yaw = self.yaw_embedding(yaw)
             yaw = yaw.unsqueeze(2).unsqueeze(3).repeat((1, 1, x.size()[-2], x.size()[-1]))
-            x = torch.concat(tensors=[x, yaw], dim=1)
+            x = torch.concat(tensors=[x, yaw], dim=1)  # B, 16, C, 2500
         
         # positional encoding
-        x = self.pos_enc(x)
+        x = self.pos_enc(x)  # B, 16, C, 2500
 
         # encoder part
         c_encoders_features = []
         for t_encoder, c_encoder in zip(self.time_encoder, self.channel_encoder):
-            x = t_encoder(x)  # B, 32, 37, 1250
+            x = t_encoder(x)  # B, 32, C, 1250
             x_c = c_encoder(x)  # B, 32, 1, 1250
-            x_c = x_c.view(x_c.shape[0], x_c.shape[1] // self.out_channels, self.out_channels, x_c.shape[3])
+            x_c = x_c.view(x_c.shape[0], x_c.shape[1] // self.out_channels, self.out_channels, x_c.shape[3])  # B, 32 / 4, 4, 1250
             c_encoders_features.insert(0, x_c)
         c_encoders_features = c_encoders_features[1:]
 

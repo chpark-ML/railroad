@@ -14,48 +14,54 @@ def _get_start_distance(mode: RunMode,
                         history_length: int,
                         rail_type: str = "curved",
                         interval: int = 50) -> pd.DataFrame:
-    assert rail_type in C.RAIL_TYPES
+    assert rail_type in C.RAIL_TYPES_TO_TRAIN
     data = {'start_distance': [], 'rail_type': [], 'yaw_type': []}
     if interval is None:
         interval = 1
 
-    # 아래 예시 주석은 다음 변수일 때 기대값입니다. (window length: 2500, histroy_length: 500)
-    for yaw in C.YAW_TYPES:
-        if mode == RunMode.TRAIN:
-            if val_type == 'pre':
-                # e.g., [2500,...,7500]
-                # window (2500~4999), ... ,(7500~9999)
-                list_start_distance = list(range(window_length,
-                                                 C.PREDICT_START_INDEX - window_length + 1,
-                                                 interval))
-            elif val_type == 'post':
-                # e.g., [0,...,5500]
-                # window (0~2499), ... ,(5500~7999)
-                list_start_distance = list(range(0,
-                                                 C.PREDICT_START_INDEX - window_length + history_length - window_length + 1,
-                                                 interval))  
+    if rail_type == 'both':
+        rail_type_list = C.RAIL_TYPES
+    else:
+        rail_type_list = list(rail_type)
 
-        elif mode == RunMode.VALIDATE:
-            if val_type == 'pre':
-                # e.g, [0], window (0~2499)
-                list_start_distance = [0]
-            elif val_type == 'post':
-                # e.g, [7500], window (7500 ~ 9999)
-                list_start_distance = [C.PREDICT_START_INDEX - window_length]  
+    for rail in rail_type_list:
+        # 아래 예시 주석은 다음 변수일 때 기대값입니다. (window length: 2500, histroy_length: 500)
+        for yaw in C.YAW_TYPES:
+            if mode == RunMode.TRAIN:
+                if val_type == 'pre':
+                    # e.g., [2500,...,7500]
+                    # window (2500~4999), ... ,(7500~9999)
+                    list_start_distance = list(range(window_length,
+                                                    C.PREDICT_START_INDEX - window_length + 1,
+                                                    interval))
+                elif val_type == 'post':
+                    # e.g., [0,...,5500]
+                    # window (0~2499), ... ,(5500~7999)
+                    list_start_distance = list(range(0,
+                                                    C.PREDICT_START_INDEX - window_length + history_length - window_length + 1,
+                                                    interval))  
 
-        elif mode == RunMode.TEST:
-            # e.g., [9500] / window (9500 ~ 11999)
-            list_start_distance = [C.PREDICT_START_INDEX - history_length] 
+            elif mode == RunMode.VALIDATE:
+                if val_type == 'pre':
+                    # e.g, [0], window (0~2499)
+                    list_start_distance = [0]
+                elif val_type == 'post':
+                    # e.g, [7500], window (7500 ~ 9999)
+                    list_start_distance = [C.PREDICT_START_INDEX - window_length]  
 
-        data['start_distance'].extend(list_start_distance)
-        data['rail_type'].extend([rail_type] * len(list_start_distance))
-        data['yaw_type'].extend([yaw] * len(list_start_distance))
+            elif mode == RunMode.TEST:
+                # e.g., [9500] / window (9500 ~ 11999)
+                list_start_distance = [C.PREDICT_START_INDEX - history_length] 
+
+            data['start_distance'].extend(list_start_distance)
+            data['rail_type'].extend([rail] * len(list_start_distance))
+            data['yaw_type'].extend([yaw] * len(list_start_distance))
 
     df = pd.DataFrame(data)
     return df
 
 
-def _get_df() -> Dict[str, Dict[str, pd.DataFrame]]:
+def _get_df(use_df_lane=True) -> Dict[str, Dict[str, pd.DataFrame]]:
     """ Loads all `.csv` from data path"""
     dict_df_rail = dict()  # {'curved': {'30': df, '40': df, ...},
                            #  'straight': {'30': df, '40': df, ...} }
@@ -73,9 +79,13 @@ def _get_df() -> Dict[str, Dict[str, pd.DataFrame]]:
             df_vib['Distance'] = (df_vib['Distance'] * 4).astype(int)
             df_vib = df_vib.set_index(keys=['Distance'], inplace=False)
 
-            df_concat = pd.concat([df_vib, df_lane], axis=1).sort_index(ascending=True)
+            if use_df_lane:
+                df_concat = pd.concat([df_vib, df_lane], axis=1).sort_index(ascending=True)
+            else:
+                df_concat = df_vib.sort_index(ascending=True)
             yaw = _dir.stem.split("_")[-1][1:]
             dict_df_yaw[yaw] = df_concat
+
         dict_df_rail[rail] = dict_df_yaw
     return dict_df_rail
 
@@ -108,7 +118,7 @@ class RailroadDataset(Dataset):
         assert val_type in ["pre", "post"]
         assert window_length > 500
         assert history_length < window_length
-        assert rail_type in C.RAIL_TYPES
+        assert rail_type in C.RAIL_TYPES_TO_TRAIN
 
         self.mode: RunMode = RunMode(mode) if isinstance(mode, str) else mode
         self.val_type = val_type
@@ -116,7 +126,7 @@ class RailroadDataset(Dataset):
         self.history_length = history_length
         self.interval = interval
 
-        self.df_data = _get_df()  # dictionary of dictionary for (rail type, yaw type)
+        self.df_data = _get_df(use_df_lane=(rail_type!='both'))  # dictionary of dictionary for (rail type, yaw type)
         self.df_index = _get_start_distance(mode=self.mode, val_type=self.val_type,
                                             window_length=self.window_length,
                                             history_length=self.history_length,
