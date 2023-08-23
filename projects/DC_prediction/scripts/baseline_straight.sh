@@ -2,10 +2,10 @@ gpu_num=$1
 
 cd /opt/railroad/projects/DC_prediction
 
-epoch=200
+epoch=1000
 BS=4
 WD=1e-2
-LR=1e-4
+LR=1e-2
 interval=50
 
 rail_type=straight
@@ -13,14 +13,14 @@ val_type=pre
 window_length=2000
 history_length=0
 in_planes=8
-f_maps=16
-num_levels=4
+f_maps=32
+num_levels=5
 kernel=5
 dilation=2
 
 HYDRA_FULL_ERROR=1 python3 main.py \
   experiment_tool.experiment_name=railroad-chpark \
-  experiment_tool.run_group=learning_rate \
+  experiment_tool.run_group=v1 \
   experiment_tool.run_name=${rail_type}_LR${LR} \
   optim.weight_decay=${WD} \
   loader.batch_size=${BS} \

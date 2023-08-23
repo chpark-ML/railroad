@@ -292,12 +292,18 @@ class Trainer():
     def save_best_metrics(self, val_metrics: Metrics, best_metrics: Metrics, epoch) -> (
             object, bool):
         found_better = False
-        if val_metrics.loss < best_metrics.loss:
+        if val_metrics is None:
+            found_better = True
+            model_path = f'model.pth'
+            self.path_best_model = model_path
+            self.epoch_best_model = epoch
+            self.save_checkpoint(model_path)
+
+        elif val_metrics.loss < best_metrics.loss:
             found_better = True
             model_path = f'model.pth'
             logger.info(f"loss improved from {best_metrics.loss:4f} to {val_metrics.loss:4f}, "
                         f"saving model to {model_path}.")
-
             best_metrics = val_metrics
             self.path_best_model = model_path
             self.epoch_best_model = epoch
@@ -339,10 +345,12 @@ class Trainer():
                          mlflow_log_prefix='EPOCH', duration=time.time() - start)
 
         # Validation for one epoch
-        val_metrics = self.validate_epoch(epoch, val_loader)
-        self.log_metrics(RunMode.VALIDATE.value, epoch, val_metrics, mlflow_log_prefix='EPOCH')
+        val_metrics = None
+        if len(val_loader) != 0:
+            val_metrics = self.validate_epoch(epoch, val_loader)
+            self.log_metrics(RunMode.VALIDATE.value, epoch, val_metrics, mlflow_log_prefix='EPOCH')
 
-        if self.optuna_trial is not None:
+        if self.optuna_trial is not None and val_metrics is not None:
             # Report intermediate objective value.
             self.optuna_trial.report(val_metrics.get_representative_metric(), epoch)
 

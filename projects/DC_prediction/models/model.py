@@ -31,16 +31,16 @@ class PositionalEncoding(nn.Module):
 class FusionBlock(nn.Module):
     def __init__(self, inplanes, planes, kernel_size=1, stride=1, padding=0):
         super(FusionBlock, self).__init__()
-        self.conv = nn.Conv2d(inplanes, planes, kernel_size=kernel_size, stride=stride, padding=padding, padding_mode='replicate', bias=False)
-        self.norm = nn.BatchNorm2d(planes, affine=True)
-        self.act_f = nn.GELU()
+        self.conv = ResidualBlock(inplanes=inplanes, planes=planes, kernel_size=kernel_size, stride=stride, padding=padding, flag_res=True)
 
     def forward(self, x_low, x_high, **kwargs):
-        x_high = F.interpolate(x_high, size=(x_low.size()[-2:]))
+        x_high = F.interpolate(x_high, scale_factor=(1, 2), mode='nearest', align_corners=False)
+        
+        diff_t = x_low.size()[3] - x_high.size()[3]
+        x_high = F.pad(x_high, [diff_t // 2, diff_t - diff_t // 2])
+
         x_concat = torch.cat([x_low, x_high], dim=1)
         x_concat = self.conv(x_concat)
-        x_concat = self.norm(x_concat)
-        x_concat = self.act_f(x_concat)
         return x_concat
 
 
@@ -53,12 +53,12 @@ class ResidualBlock(nn.Module):
         self.flag_res = flag_res
         self.conv1 = nn.Conv2d(inplanes, planes,
                                kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation,
-                               padding_mode='replicate', bias=False)
+                               padding_mode='zeros', bias=False)
         self.norm1 = nn.BatchNorm2d(planes, affine=True)
 
         self.conv2 = nn.Conv2d(planes, planes,
                                kernel_size=1, stride=1, padding=0,
-                               padding_mode='replicate', bias=False)
+                               padding_mode='zeros', bias=False)
         self.norm2 = nn.BatchNorm2d(planes, affine=True)
 
         if self.flag_res:
@@ -118,7 +118,7 @@ class RailModel(nn.Module):
 
         # embedding 
         self.rail_embedding = nn.Sequential(
-            nn.Conv2d(1, in_planes, kernel_size=(1, kernel), stride=(1, 1), padding=(0, kernel//2), padding_mode='replicate', dilation=1, groups=1, bias=False),
+            nn.Conv2d(1, in_planes, kernel_size=(1, kernel), stride=(1, 1), padding=(0, kernel//2), padding_mode='zeros', dilation=1, groups=1, bias=False),
             nn.BatchNorm2d(in_planes, affine=True),
             nn.GELU(),
         )
@@ -146,7 +146,20 @@ class RailModel(nn.Module):
         for f_l, f_h in zip(r_f_maps[1:], r_f_maps[:-1]):
             fusion_layers.append(FusionBlock(f_l + f_h, f_l))
         self.decoders = nn.ModuleList(fusion_layers)
-        self.final_conv = nn.Conv2d(f_maps[0], 1, kernel_size=1, stride=1, padding=0, bias=False)
+
+        drop_p = 0.1
+        self.final_conv = nn.Sequential(
+            nn.Conv2d(f_maps[0], 50, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.Dropout2d(p=drop_p),
+            nn.Sigmoid(),
+            nn.Conv2d(50, 30, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.Dropout2d(p=drop_p),
+            nn.Sigmoid(),
+            nn.Conv2d(30, 15, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.Dropout2d(p=drop_p),
+            nn.Sigmoid(),
+            nn.Conv2d(15, 1, kernel_size=1, stride=1, padding=0, bias=True),
+        )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
