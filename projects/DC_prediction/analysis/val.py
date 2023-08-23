@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 
 import hydra
 import omegaconf
@@ -7,6 +8,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import pandas as pd
 import tqdm
+from omegaconf import DictConfig, OmegaConf
 
 import projects.DC_prediction.utils.constants as C
 from projects.DC_prediction.train import _get_loaders_and_trainer
@@ -57,15 +59,16 @@ def main(config: omegaconf.DictConfig) -> None:
     # load answer sheet
     df_ans = pd.read_csv(C.ANSWER_SAMPLE)
 
-    # curved 
+    # checkpoint path
     ckpts = {
-        'curved': C.CKPT_HOME / 'baseline/baseline-post-interval50-curved-window-4000-2000-inplane16-fmaps32/2023-08-22_23-25-54/model.pth',
-        'straight': C.CKPT_HOME / 'baseline/baseline-post-interval50-straight-window-4000-2000-inplane16-fmaps32/2023-08-22_23-25-55/model.pth'
+        'curved': C.CKPT_HOME / 'baseline/baseline-pre-interval50-curved-window-2000-0-inplane8-fmaps16-k5-d2/2023-08-23_12-46-38',
+        'straight': C.CKPT_HOME / 'baseline/baseline-pre-interval50-straight-window-2000-0-inplane8-fmaps16-k5-d2/2023-08-23_12-46-58'
     }
     for rail in C.RAIL_TYPES:
-        config.loader.dataset.rail_type=rail
+        ckpt_path = ckpts[rail] / Path("model.pth")
+        config_path = ckpts[rail] / Path(".hydra/config.yaml")
+        config = OmegaConf.load(config_path)
         model = hydra.utils.instantiate(config.model)
-        ckpt_path = ckpts[rail]
 
         # gpus = 0
         # torch_device = f'cuda:{gpus}'
