@@ -3,10 +3,10 @@ _target_: torch.utils.data.DataLoader
 dataset:
   _target_: projects.DC_prediction.datasets.railroad.RailroadDataset
   mode: train
-  val_type: pre
+  val_type: pre  # [pre, post, wo]
   window_length: 2500
   history_length: 500
-  rail_type: both
+  rail_type: curved  # [curved, straight, both]
   interval: 30
 
 batch_size: 4

@@ -40,6 +40,12 @@ def _get_start_distance(mode: RunMode,
                     list_start_distance = list(range(0,
                                                     C.PREDICT_START_INDEX - window_length + history_length - window_length + 1,
                                                     interval))  
+                elif val_type == 'wo':
+                    # e.g., [0,...,7500]
+                    # window (0~2499), ... ,(7500~9999)
+                    list_start_distance = list(range(0,
+                                                    C.PREDICT_START_INDEX - window_length + 1,
+                                                    interval))  
 
             elif mode == RunMode.VALIDATE:
                 if val_type == 'pre':
@@ -47,7 +53,10 @@ def _get_start_distance(mode: RunMode,
                     list_start_distance = [0]
                 elif val_type == 'post':
                     # e.g, [7500], window (7500 ~ 9999)
-                    list_start_distance = [C.PREDICT_START_INDEX - window_length]  
+                    list_start_distance = [C.PREDICT_START_INDEX - window_length]
+                elif val_type == 'wo':
+                    # e.g, []
+                    list_start_distance = []
 
             elif mode == RunMode.TEST:
                 # e.g., [9500] / window (9500 ~ 11999)
@@ -115,7 +124,7 @@ class RailroadDataset(Dataset):
                  history_length: int,
                  rail_type: str = "curved",
                  interval: int = None):
-        assert val_type in ["pre", "post"]
+        assert val_type in ["pre", "post", "wo"]
         assert history_length < window_length
         assert rail_type in C.RAIL_TYPES_TO_TRAIN
 
