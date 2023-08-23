@@ -34,7 +34,7 @@ class FusionBlock(nn.Module):
         self.conv = ResidualBlock(inplanes=inplanes, planes=planes, kernel_size=kernel_size, stride=stride, padding=padding, flag_res=True)
 
     def forward(self, x_low, x_high, **kwargs):
-        x_high = F.interpolate(x_high, scale_factor=(1, 2), mode='nearest', align_corners=False)
+        x_high = F.interpolate(x_high, scale_factor=(1, 2), mode='bilinear', align_corners=False)
         
         diff_t = x_low.size()[3] - x_high.size()[3]
         x_high = F.pad(x_high, [diff_t // 2, diff_t - diff_t // 2])
