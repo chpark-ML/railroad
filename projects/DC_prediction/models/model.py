@@ -131,8 +131,10 @@ class RailModel(nn.Module):
                                                 planes=f, kernel_size=(1, kernel),
                                                 stride=(1, 1) if idx == 0 else (1, kernel//2), 
                                                 dilation=(1, dilation), padding=(0, kernel//2 * dilation), flag_res=True))
-            cross_channel_layers.append(ResidualBlock(inplanes=f, planes=f, kernel_size=(self.num_channels, 1),
-                                                      stride=1, dilation=1, padding=0, flag_res=True))
+            cross_channel_layers.append(nn.Sequential(
+                ResidualBlock(inplanes=f, planes=f, kernel_size=(self.num_channels, 1), stride=1, dilation=1, padding=0, flag_res=True),
+                ResidualBlock(inplanes=f, planes=f * self.out_channels, kernel_size=(1, 1), stride=1, dilation=1, padding=0, flag_res=True),
+            ))
             self.inplanes = f
 
         self.time_encoder = nn.ModuleList(dynamic_layers)
@@ -140,11 +142,11 @@ class RailModel(nn.Module):
 
         # create decoders
         fusion_layers = []
-        r_f_maps = [f // self.out_channels for f in f_maps[::-1]]
+        r_f_maps = [f for f in f_maps[::-1]]
         for f_l, f_h in zip(r_f_maps[1:], r_f_maps[:-1]):
             fusion_layers.append(FusionBlock(f_l + f_h, f_l))
         self.decoders = nn.ModuleList(fusion_layers)
-        self.final_conv = nn.Conv2d(f_maps[0] // self.out_channels, 1, kernel_size=1, stride=1, padding=0, bias=True)
+        self.final_conv = nn.Conv2d(f_maps[0], 1, kernel_size=1, stride=1, padding=0, bias=False)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):

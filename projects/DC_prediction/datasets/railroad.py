@@ -116,7 +116,6 @@ class RailroadDataset(Dataset):
                  rail_type: str = "curved",
                  interval: int = None):
         assert val_type in ["pre", "post"]
-        assert window_length > 500
         assert history_length < window_length
         assert rail_type in C.RAIL_TYPES_TO_TRAIN
 
