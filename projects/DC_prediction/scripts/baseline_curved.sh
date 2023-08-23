@@ -7,7 +7,7 @@ BS=4
 interval=50
 
 rail_type=curved
-val_type=post
+val_type=pre
 window_length=2500
 history_length=500
 in_planes=8

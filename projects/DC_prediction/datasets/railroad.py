@@ -22,7 +22,7 @@ def _get_start_distance(mode: RunMode,
     if rail_type == 'both':
         rail_type_list = C.RAIL_TYPES
     else:
-        rail_type_list = list(rail_type)
+        rail_type_list = [rail_type]
 
     for rail in rail_type_list:
         # 아래 예시 주석은 다음 변수일 때 기대값입니다. (window length: 2500, histroy_length: 500)
