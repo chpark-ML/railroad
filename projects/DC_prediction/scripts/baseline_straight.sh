@@ -2,16 +2,16 @@ gpu_num=$1
 
 cd /opt/railroad/projects/DC_prediction
 
-epoch=500
+epoch=200
 BS=4
 interval=50
 
 rail_type=straight
 val_type=post
-window_length=4000
-history_length=2000
-in_planes=16
-f_maps=32
+window_length=2500
+history_length=500
+in_planes=8
+f_maps=16
 
 HYDRA_FULL_ERROR=1 python3 main.py \
   experiment_tool.experiment_name=railroad-chpark \

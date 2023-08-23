@@ -59,8 +59,8 @@ def main(config: omegaconf.DictConfig) -> None:
 
     # curved 
     ckpts = {
-        'curved': '/opt/railroad/projects/DC_prediction/outputs/baseline/baseline-interval5-curved/2023-08-22_16-36-49/model.pth',
-        'straight': '/opt/railroad/projects/DC_prediction/outputs/baseline/baseline-interval5-straight/2023-08-22_16-45-43/model.pth'
+        'curved': '/opt/railroad/projects/DC_prediction/outputs/baseline/baseline-post-interval50-curved-window-4000-2000-inplane16-fmaps32/2023-08-22_23-25-54/model.pth',
+        'straight': '/opt/railroad/projects/DC_prediction/outputs/baseline/baseline-post-interval50-straight-window-4000-2000-inplane16-fmaps32/2023-08-22_23-25-55/model.pth'
     }
     for rail in C.RAIL_TYPES:
         config.loader.dataset.rail_type=rail
