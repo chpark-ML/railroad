@@ -52,7 +52,7 @@ class ResidualBlock(nn.Module):
         self.dilation = dilation
         self.flag_res = flag_res
         self.conv1 = nn.Conv2d(inplanes, planes,
-                               kernel_size=kernel_size, stride=stride, padding=padding,
+                               kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation,
                                padding_mode='replicate', bias=False)
         self.norm1 = nn.BatchNorm2d(planes, affine=True)
 
@@ -94,7 +94,7 @@ class ResidualBlock(nn.Module):
     
 
 class RailModel(nn.Module):
-    def __init__(self, in_planes, f_maps=32, num_levels=4,
+    def __init__(self, in_planes, f_maps=32, num_levels=4, kernel=5, dilation=2, 
                  rail_type="curved", window_length=2500, out_channels=4, **kwargs):
         super(RailModel, self).__init__()
 
@@ -118,7 +118,7 @@ class RailModel(nn.Module):
 
         # embedding 
         self.rail_embedding = nn.Sequential(
-            nn.Conv2d(1, in_planes, kernel_size=(1, 5), stride=(1, 1), padding=(0, 2), padding_mode='replicate', dilation=1, groups=1, bias=False),
+            nn.Conv2d(1, in_planes, kernel_size=(1, kernel), stride=(1, 1), padding=(0, kernel//2), padding_mode='replicate', dilation=1, groups=1, bias=False),
             nn.BatchNorm2d(in_planes, affine=True),
             nn.GELU(),
         )
@@ -128,9 +128,9 @@ class RailModel(nn.Module):
         cross_channel_layers = []
         for idx, f in enumerate(f_maps):
             dynamic_layers.append(ResidualBlock(inplanes=2 * self.inplanes if idx == 0 else self.inplanes, 
-                                                planes=f, kernel_size=(1, 5),
-                                                stride=(1, 1) if idx == 0 else (1, 2), 
-                                                dilation=1, padding=(0, 2), flag_res=True))
+                                                planes=f, kernel_size=(1, kernel),
+                                                stride=(1, 1) if idx == 0 else (1, kernel//2), 
+                                                dilation=(1, dilation), padding=(0, kernel//2 * dilation), flag_res=True))
             cross_channel_layers.append(ResidualBlock(inplanes=f, planes=f, kernel_size=(self.num_channels, 1),
                                                       stride=1, dilation=1, padding=0, flag_res=True))
             self.inplanes = f
@@ -155,12 +155,13 @@ class RailModel(nn.Module):
     def forward(self, x: torch.Tensor, yaw: torch.Tensor = None):
         # embedding
         x = self.rail_embedding(x)  # B, 16, C, 2500
+
         if yaw is not None:
             # FIXME: this code will NOT operate due to tensor dimension issue
             yaw = self.yaw_embedding(yaw)
             yaw = yaw.unsqueeze(2).unsqueeze(3).repeat((1, 1, x.size()[-2], x.size()[-1]))
             x = torch.concat(tensors=[x, yaw], dim=1)  # B, 16, C, 2500
-        
+
         # positional encoding
         x = self.pos_enc(x)  # B, 16, C, 2500
 
