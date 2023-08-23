@@ -4,7 +4,8 @@ from pathlib import Path
 YAW_TYPES = ['30', '40', '50', '70', '100']
 YAW_MAPPER = {yaw: idx for idx, yaw in enumerate(YAW_TYPES)}
 RAIL_TYPES = ['curved', 'straight']
-NUM_CHANNEL_MAPPER = {'curved': 37, 'straight': 39}
+RAIL_TYPES_TO_TRAIN = ['curved', 'straight', 'both']
+NUM_CHANNEL_MAPPER = {'curved': 37, 'straight': 39, 'both': 34}
 
 PREDICT_COLS = ["YL_M1_B1_W1", "YR_M1_B1_W1", "YL_M1_B1_W2", "YR_M1_B1_W2"]
 PREDICT_COL_MAPPER = {col: idx for idx, col in enumerate(PREDICT_COLS)}
