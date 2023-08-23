@@ -2,7 +2,7 @@ gpu_num=$1
 
 cd /opt/railroad/projects/DC_prediction
 
-epoch=1000
+epoch=200
 BS=4
 WD=1e-2
 LR=1e-2
@@ -21,7 +21,7 @@ dilation=2
 HYDRA_FULL_ERROR=1 python3 main.py \
   experiment_tool.experiment_name=railroad-chpark \
   experiment_tool.run_group=v1 \
-  experiment_tool.run_name=${rail_type}_LR${LR} \
+  experiment_tool.run_name=${rail_type} \
   optim.weight_decay=${WD} \
   loader.batch_size=${BS} \
   loader.dataset.val_type=${val_type} \
@@ -34,7 +34,6 @@ HYDRA_FULL_ERROR=1 python3 main.py \
   model.num_levels=${num_levels} \
   model.kernel=${kernel} \
   model.dilation=${dilation} \
-  scheduler.max_lr=${LR} \
   trainer.max_epoch=${epoch} \
   trainer.gpus=${gpu_num} \
   trainer.fast_dev_run=False
