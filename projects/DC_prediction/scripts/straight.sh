@@ -1,10 +1,10 @@
 gpu_num=0
 cd /opt/railroad/projects/DC_prediction
 
-exp_name=baseline
+exp_name=baseline-inter50
 
-epoch=20
-interval=10
+epoch=100
+interval=50
 window_length=2500
 history_length=500
 val_type=pre
@@ -13,7 +13,7 @@ BS=8
 LR=1e-3
 WD=1e-2
 
-in_planes=16
+in_planes=8
 f_maps=16
 num_levels=4
 kernel=5

@@ -1,4 +1,4 @@
-gpu_num=$1
+gpu_num=0
 
 cd /opt/railroad/projects/DC_prediction
 
