@@ -25,17 +25,32 @@ class RailModel(nn.Module):
         self.window_length = window_length
         self.out_channels = out_channels
 
-        # embedding layer
-        self.embedding = M.EmbeddingBlock(d_model=in_planes, kernel=7, max_seq_len=self.window_length)
+        # conv block
+        self.rail_embedding = nn.Sequential(
+            nn.Conv2d(1, in_planes, kernel_size=(1, 3), stride=1, padding=(0, 1), bias=False),
+            nn.BatchNorm2d(in_planes),
+            nn.LeakyReLU(inplace=True),
+        )
 
         # create encoders
         dynamic_layers = []
         cross_channel_layers = []
         for idx, f in enumerate(f_maps):
+
+            if idx == 0 :
+                _kernel = (1, 3)
+                _stride = (1, 1)
+                _dilation = (1, 1)
+                _padding = (0, _kernel[-1]//2)
+            else :
+                _kernel = (1, kernel)
+                _stride = (1, 2)
+                _dilation = (1, 2)
+                _padding = (0, kernel//2 * dilation)
+                
             dynamic_layers.append(M.ResidualBlock(inplanes=self.inplanes, 
-                                                  planes=f, kernel_size=(1, kernel),
-                                                  stride=(1, 1) if idx == 0 else (1, kernel//2), 
-                                                  dilation=(1, dilation), padding=(0, kernel//2 * dilation), flag_res=True))
+                                                  planes=f, kernel_size=_kernel, stride=_stride, 
+                                                  dilation=_dilation, padding=_padding, flag_res=True))
             cross_channel_layers.append(nn.Sequential(
                 M.ResidualBlock(inplanes=f, planes=f * self.out_channels, kernel_size=(self.num_channels, 1), stride=1, dilation=1, padding=0, flag_res=True),
             ))
@@ -44,6 +59,7 @@ class RailModel(nn.Module):
         self.channel_encoder = nn.ModuleList(cross_channel_layers)
 
         # catch dependency between [y, t'] (e.g., [4, 125])
+        self.embedding = M.EmbeddingBlock(d_model=f_maps[-1], kernel=1, max_seq_len=self.window_length)
         self.global_encoder = M.MultiHeadSelfAttention(n_featuremap=f_maps[-1], n_heads=1,  d_k=f_maps[-1] // 2)
 
         # create decoders
@@ -58,13 +74,13 @@ class RailModel(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.xavier_normal_(m.weight)
+                nn.init.kaiming_normal_(m.weight)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
                     
     def forward(self, x: torch.Tensor, yaw: torch.Tensor = None):
         # embedding
-        x = self.embedding(x, yaw)  # torch.Size([4, 16, 37, 2000])
+        x = self.rail_embedding(x)  # torch.Size([4, 16, 37, 2000])
         
         # encoder part
         """
@@ -81,6 +97,7 @@ class RailModel(nn.Module):
             c_encoders_features.insert(0, x_c)
 
         # prepare inputs for decoder
+        x_c = self.embedding(x_c, yaw)
         x_c = self.global_encoder(x_c)  # B, 256, 4, 125
         c_encoders_features = c_encoders_features[1:]
 
