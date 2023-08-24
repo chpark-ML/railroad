@@ -58,8 +58,8 @@ def main() -> None:
 
     # checkpoint path
     ckpts = {
-        'curved': C.CKPT_HOME / 'v1/curved_LR1e-2/2023-08-23_23-44-37',
-        'straight': C.CKPT_HOME / 'v1/straight_LR1e-2/2023-08-23_23-44-47'
+        'curved': C.CKPT_HOME / 'v3/curved/2023-08-24_10-03-40',
+        'straight': C.CKPT_HOME / 'v3/straight/2023-08-24_10-03-42'
     }
     for rail in C.RAIL_TYPES:
         ckpt_path = ckpts[rail] / Path("model.pth")
