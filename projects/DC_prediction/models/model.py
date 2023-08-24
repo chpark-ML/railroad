@@ -44,7 +44,7 @@ class RailModel(nn.Module):
         self.channel_encoder = nn.ModuleList(cross_channel_layers)
 
         # catch dependency between [y, t'] (e.g., [4, 125])
-        self.global_encoder = M.MultiHeadSelfAttention(n_featuremap=f_maps[-1], n_heads=4,  d_k=f_maps[-1] * 2)
+        self.global_encoder = M.MultiHeadSelfAttention(n_featuremap=f_maps[-1], n_heads=1,  d_k=f_maps[-1])
 
         # create decoders
         fusion_layers = []
@@ -54,8 +54,7 @@ class RailModel(nn.Module):
         self.decoders = nn.ModuleList(fusion_layers)
 
         # classifier
-        drop_p = 0.01
-        self.classifier = M.Classifier(f_maps[0], drop_p=drop_p)
+        self.classifier = M.Classifier(f_maps[0])
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):

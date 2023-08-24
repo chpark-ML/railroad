@@ -40,11 +40,6 @@ def _seed_everything(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    # torch.use_deterministic_algorithms(True)
-    # If the above line is uncommented, we get the following RuntimeError:
-    #  max_pool3d_with_indices_backward_cuda does not have a deterministic implementation
-    torch.backends.cudnn.benchmark = False
 
 
 def set_config(config: OmegaConf, default_config_path: str = _DEFAULT_CONFIG_FILE) -> OmegaConf:
