@@ -1,20 +1,20 @@
 gpu_num=0
 cd /opt/railroad/projects/DC_prediction
 
-exp_name=baseline-inter50
+exp_name=baseline
 
-epoch=100
+epoch=50
 interval=50
-window_length=2500
-history_length=500
+window_length=2100
+history_length=100
 val_type=pre
 
-BS=8
-LR=1e-3
+BS=4
+LR=1e-2
 WD=1e-2
 
-in_planes=8
-f_maps=16
+in_planes=16
+f_maps=32
 num_levels=4
 kernel=5
 dilation=2
@@ -23,7 +23,7 @@ rail_type=curved
 HYDRA_FULL_ERROR=1 python3 main.py \
     experiment_tool.experiment_name=railroad-chpark \
     experiment_tool.run_group=${exp_name} \
-    experiment_tool.run_name=${exp_name}-${rail_type}-f${f_maps} \
+    experiment_tool.run_name=${exp_name}-${rail_type}-f${f_maps}-LR${LR} \
     optim.weight_decay=${WD} \
     loader.batch_size=${BS} \
     loader.dataset.val_type=${val_type} \

@@ -8,7 +8,7 @@ import projects.DC_prediction.utils.constants as C
 
 
 class Classifier(nn.Module):
-    def __init__(self, inplanes, drop_p=0.01):
+    def __init__(self, inplanes, drop_p=0.2):
         super(Classifier, self).__init__()
         self.classifier = nn.Sequential(
             nn.Conv2d(inplanes, 50, kernel_size=1, bias=True),
@@ -32,7 +32,6 @@ class EmbeddingBlock(nn.Module):
         self.d_model = d_model
         self.max_seq_len = max_seq_len
         self.yaw_embedding = nn.Embedding(num_embeddings=len(C.YAW_TYPES), embedding_dim=d_model)
-        self.rail_embedding = nn.Conv2d(1, d_model, kernel_size=(1, kernel), stride=(1, 1), padding=(0, kernel//2), padding_mode='zeros', dilation=1, groups=1, bias=False)
         self.positional_encoding = self.generate_positional_encoding()
 
     def generate_positional_encoding(self):
@@ -44,16 +43,11 @@ class EmbeddingBlock(nn.Module):
         return pe.unsqueeze(0)  # Add batch dimension
 
     def forward(self, x, yaw=None):
-        x = self.rail_embedding(x)
-        pe = self.positional_encoding[:, :x.size(-1), :].permute(0, 2, 1).unsqueeze(2).to(x.device)
-
+        pe = self.positional_encoding[:, :x.size(-1), :].permute(0, 2, 1).unsqueeze(2).to(x.device)  # [B, f, 1, t']
         if yaw is not None:
-            yaw = self.yaw_embedding(yaw)
-            yaw = yaw.unsqueeze(2).unsqueeze(3).repeat((1, 1, x.size()[-2], x.size()[-1]))
-
+            yaw = self.yaw_embedding(yaw).unsqueeze(2).unsqueeze(3)  # [B, f, 1, 1]
             return x + pe+ yaw
-
-        return  y + pe
+        return  x + pe
     
 
 class FusionBlock(nn.Module):
@@ -82,43 +76,48 @@ class ResidualBlock(nn.Module):
         self.conv1 = nn.Conv2d(inplanes, planes,
                                kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation,
                                padding_mode='zeros', bias=False)
-        self.norm1 = nn.LayerNorm(planes, eps=1e-6)
+        # self.norm1 = nn.LayerNorm(planes, eps=1e-6)
+        self.norm1 = nn.BatchNorm2d(planes)
 
         self.conv2 = nn.Conv2d(planes, planes,
                                kernel_size=1, stride=1, padding=0,
                                padding_mode='zeros', bias=False)
-        self.norm2 = nn.LayerNorm(planes, eps=1e-6)
+        # self.norm2 = nn.LayerNorm(planes, eps=1e-6)
+        self.norm2 = nn.BatchNorm2d(planes)
 
         if self.flag_res:
             if stride != 1 or inplanes != planes * self.expansion :
                 self.downsample = nn.Sequential(
-                        nn.Linear(inplanes, planes * self.expansion),
-                        nn.LayerNorm(planes * self.expansion, eps=1e-6)
+                        # nn.Linear(inplanes, planes * self.expansion),
+                        # nn.LayerNorm(planes * self.expansion, eps=1e-6),
+                        nn.Conv2d(inplanes, planes * self.expansion, kernel_size=1, stride=1, padding=0,
+                                  padding_mode='zeros', bias=False),
+                        nn.BatchNorm2d(planes * self.expansion),
                     )
             else :
                 self.downsample = None
 
-        self.act_f = nn.GELU()
+        self.act_f = nn.LeakyReLU(inplace=True)
 
     def forward(self, x, **kwargs):
         residual = x
         out = self.conv1(x)
-        out = out.permute(0, 2, 3, 1)
+        # out = out.permute(0, 2, 3, 1)
         out = self.norm1(out)
-        out = out.permute(0, 3, 1, 2)
+        # out = out.permute(0, 3, 1, 2)
         out = self.act_f(out)
 
         out = self.conv2(out)
-        out = out.permute(0, 2, 3, 1)
+        # out = out.permute(0, 2, 3, 1)
         out = self.norm2(out)
-        out = out.permute(0, 3, 1, 2)
+        # out = out.permute(0, 3, 1, 2)
 
         if self.flag_res:
             ## downsample the residual
             if self.downsample is not None:
-                residual = residual.permute(0, 2, 3, 1)
+                # residual = residual.permute(0, 2, 3, 1)
                 residual = self.downsample(residual)
-                residual = residual.permute(0, 3, 1, 2)
+                # residual = residual.permute(0, 3, 1, 2)
 
             ## crop and residual connection
             out += residual[:, :, :out.size()[-2], :out.size()[-1]]
@@ -144,8 +143,9 @@ class MultiHeadSelfAttention(nn.Module):
 
         self.softmax = nn.Softmax(dim=-1)
         self.output_conv = nn.Conv2d(self.num_heads * self.d_k, n_featuremap, kernel_size=1, bias=False)
-        self.norm = nn.LayerNorm(n_featuremap, eps=1e-6)
-        self.act_f = nn.GELU()
+        # self.norm = nn.LayerNorm(n_featuremap, eps=1e-6)
+        self.norm = nn.BatchNorm2d(n_featuremap)
+        self.act_f = nn.LeakyReLU(inplace=True)
 
         """ gamma """
         self.gamma = nn.Parameter(torch.zeros(1))
@@ -204,9 +204,9 @@ class MultiHeadSelfAttention(nn.Module):
         """ linear to get output """
         out = out.view(m_batchsize, width, height, -1).permute(0, 3, 1, 2)
         out = self.output_conv(out)
-        out = out.permute(0, 2, 3, 1)
+        # out = out.permute(0, 2, 3, 1)
         out = self.norm(out)
-        out = out.permute(0, 3, 1, 2)
+        # out = out.permute(0, 3, 1, 2)
 
         """ residual """
         out = self.gamma * out
