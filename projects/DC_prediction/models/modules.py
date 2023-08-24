@@ -11,10 +11,10 @@ class Classifier(nn.Module):
     def __init__(self, inplanes, drop_p=0.1):
         super(Classifier, self).__init__()
         self.classifier = nn.Sequential(
-            nn.Conv2d(inplanes, 80, kernel_size=1, bias=True),
+            nn.Conv2d(inplanes, 50, kernel_size=1, bias=True),
             nn.Dropout2d(p=drop_p),
-            nn.Sigmoid(),
-            nn.Conv2d(80, 1, kernel_size=1, bias=True))
+            nn.GELU(),
+            nn.Conv2d(50, 1, kernel_size=1, bias=True))
 
     def forward(self, x):
         return self.classifier(x)
@@ -76,13 +76,11 @@ class ResidualBlock(nn.Module):
         self.conv1 = nn.Conv2d(inplanes, planes,
                                kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation,
                                padding_mode='zeros', bias=False)
-        # self.norm1 = nn.BatchNorm2d(planes, affine=True)
         self.norm1 = nn.LayerNorm(planes, eps=1e-6)
 
         self.conv2 = nn.Conv2d(planes, planes,
                                kernel_size=1, stride=1, padding=0,
                                padding_mode='zeros', bias=False)
-        # self.norm2 = nn.BatchNorm2d(planes, affine=True)
         self.norm2 = nn.LayerNorm(planes, eps=1e-6)
 
         if self.flag_res:

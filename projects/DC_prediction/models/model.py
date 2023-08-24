@@ -44,7 +44,7 @@ class RailModel(nn.Module):
         self.channel_encoder = nn.ModuleList(cross_channel_layers)
 
         # catch dependency between [y, t'] (e.g., [4, 125])
-        self.global_encoder = M.MultiHeadSelfAttention(n_featuremap=f_maps[-1], n_heads=1,  d_k=f_maps[-1])
+        self.global_encoder = M.MultiHeadSelfAttention(n_featuremap=f_maps[-1], n_heads=4,  d_k=f_maps[-1] * 2)
 
         # create decoders
         fusion_layers = []
@@ -54,12 +54,12 @@ class RailModel(nn.Module):
         self.decoders = nn.ModuleList(fusion_layers)
 
         # classifier
-        drop_p = 0.1
+        drop_p = 0.01
         self.classifier = M.Classifier(f_maps[0], drop_p=drop_p)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.xavier_uniform_(m.weight)
+                nn.init.xavier_normal_(m.weight)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
                     
@@ -69,11 +69,10 @@ class RailModel(nn.Module):
         
         # encoder part
         """
-        torch.Size([4, 16, 4, 2000])
-        torch.Size([4, 32, 4, 1000])
-        torch.Size([4, 64, 4, 500])
-        torch.Size([4, 128, 4, 250])
-        torch.Size([4, 256, 4, 125])
+        torch.Size([4, 32, 4, 2500])
+        torch.Size([4, 64, 4, 1250])
+        torch.Size([4, 128, 4, 625])
+        torch.Size([4, 256, 4, 313])
         """
         c_encoders_features = []
         for t_encoder, c_encoder in zip(self.time_encoder, self.channel_encoder):
@@ -87,6 +86,11 @@ class RailModel(nn.Module):
         c_encoders_features = c_encoders_features[1:]
 
         # decoder part
+        """
+        torch.Size([4, 128, 4, 625])
+        torch.Size([4, 64, 4, 1250])
+        torch.Size([4, 32, 4, 2500])
+        """
         for decoder, encoder_feature in zip(self.decoders, c_encoders_features):
             x_c = decoder(encoder_feature, x_c)
 

@@ -14,12 +14,12 @@ dataset:
       sigma: 0.5
     rescale_time:
       p: 0.5
-      min_scale_factor: 0.9
-      max_scale_factor: 1.1
+      min_scale_factor: 1.0  # 작은 사이즈로 resize되고 zero padding하게되면 정의된 문제에 적당하지 않으므로, 1.0으로 세팅할 것.
+      max_scale_factor: 1.2
 
 
 batch_size: 4
 num_workers: 0
 pin_memory: True
-prefetch_factor:
+prefetch_factor: 2
 drop_last: False

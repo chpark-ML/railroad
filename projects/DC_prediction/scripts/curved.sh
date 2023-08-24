@@ -2,18 +2,18 @@ gpu_num=$1
 
 cd /opt/railroad/projects/DC_prediction
 
-epoch=100
+epoch=200
 BS=4
 WD=1e-2
-interval=10
+interval=50
 
 rail_type=curved
 val_type=pre
-window_length=2000
-history_length=0
+window_length=2500
+history_length=500
 in_planes=16
-f_maps=16
-num_levels=5
+f_maps=32
+num_levels=4
 kernel=5
 dilation=2
 

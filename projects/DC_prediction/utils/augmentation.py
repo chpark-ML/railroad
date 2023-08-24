@@ -40,8 +40,7 @@ class RescaleTime:
 
         if random.random() <= self.p:
             # random rescale
-            random_scale_factor = tuple(0, np.random.uniform(low=self.min_scale_factor, 
-                                                             high=self.max_scale_factor, size=1))
+            random_scale_factor = tuple([1, float(np.random.uniform(low=self.min_scale_factor, high=self.max_scale_factor, size=1))])
             _x = F.interpolate(torch.tensor(x).unsqueeze(0).unsqueeze(0), scale_factor=random_scale_factor, 
                                mode="bilinear", align_corners=True)
             _y = F.interpolate(torch.tensor(y).unsqueeze(0).unsqueeze(0), scale_factor=random_scale_factor,
@@ -50,8 +49,9 @@ class RescaleTime:
             input_shape = x.shape
             rescaled_input_shape = np.array(_x.shape[-2:])
             diff = input_shape - rescaled_input_shape
-            breakpoint()
-            pad_left_only = tuple(np.array([[int(i // 2 * 2), 0, 0, 0] for i in diff]).ravel()[::-1])
+            
+            # resize 이전 크기와 비교했을 떄의 차이는 과거 데이터를 지우는 것으로 한다.
+            pad_left_only = tuple(np.array([[0, i] for i in diff]).ravel()[::-1])
 
             # zero padding
             _x = F.pad(_x, pad_left_only, "constant", 0).squeeze().numpy()
