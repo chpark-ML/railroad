@@ -108,13 +108,13 @@ class Compose:
         self.mode = mode
         self.transform = transform
 
-    def __call__(self, tensor, mask=None):
+    def __call__(self, x, y):
         if self.mode == 'train':
             # Apply transform
             for f in self.transform:
-                tensor = f(tensor)
+                x, y = f(x, y)
 
-        return tensor
+        return x, y
         
 
 class RailroadDataset(Dataset):
@@ -132,7 +132,8 @@ class RailroadDataset(Dataset):
 
         self.mode: RunMode = RunMode(mode) if isinstance(mode, str) else mode
         self.val_type = val_type
-        self.window_length = window_length
+        self.window_length = window_length 
+
         self.history_length = history_length
         self.interval = interval
         self.num_channels = C.NUM_CHANNEL_MAPPER[rail_type]
