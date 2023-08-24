@@ -17,7 +17,7 @@ class Classifier(nn.Module):
             nn.Conv2d(50, 30, kernel_size=1, bias=True),
             nn.Dropout2d(p=drop_p),
             nn.Sigmoid(),
-            nn.Conv2d(30, 15, kernel_size=1, bias=False),
+            nn.Conv2d(30, 15, kernel_size=1, bias=True),
             nn.Dropout2d(p=drop_p),
             nn.Sigmoid(),
             nn.Conv2d(15, 1, kernel_size=1, bias=False))
