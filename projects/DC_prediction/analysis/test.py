@@ -60,8 +60,8 @@ def main() -> None:
     ckpts = {
         # 'curved': C.CKPT_HOME / 'v3/curved/2023-08-24_10-03-40',
         # 'straight': C.CKPT_HOME / 'v3/straight/2023-08-24_10-03-42',
-        'curved': "/opt/railroad/projects/DC_prediction/outputs/baseline-inter50/baseline-inter50-curved-f16-LR1e-4/2023-08-24_22-51-09",
-        'straight': "/opt/railroad/projects/DC_prediction/outputs/baseline-inter50/baseline-inter50-straight-f16-LR1e-4/2023-08-24_22-51-11",
+        'curved': "/opt/railroad/projects/DC_prediction/outputs/baseline/baseline-curved-f32-LR1e-2/2023-08-25_07-24-08",
+        'straight': "/opt/railroad/projects/DC_prediction/outputs/baseline/baseline-straight-f32-LR1e-2/2023-08-25_07-24-09",
     }
     for rail in C.RAIL_TYPES:
         ckpt_path = ckpts[rail] / Path("model.pth")

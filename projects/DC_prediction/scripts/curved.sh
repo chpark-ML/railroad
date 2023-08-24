@@ -1,13 +1,13 @@
 gpu_num=0
 cd /opt/railroad/projects/DC_prediction
 
-exp_name=baseline
+exp_name=baseline-wo
 
 epoch=50
 interval=50
 window_length=2100
 history_length=100
-val_type=pre
+val_type=wo
 
 BS=4
 LR=1e-2
