@@ -6,6 +6,7 @@ from torch.utils.data import Dataset
 
 from projects.DC_prediction.utils.enums import RunMode
 import projects.DC_prediction.utils.constants as C
+import projects.DC_prediction.utils.augmentation as aug
 
 
 def _get_start_distance(mode: RunMode,
@@ -123,7 +124,8 @@ class RailroadDataset(Dataset):
                  window_length: int,
                  history_length: int,
                  rail_type: str = "curved",
-                 interval: int = None):
+                 interval: int = None, 
+                 augmentation: dict = None):
         assert val_type in ["pre", "post", "wo"]
         assert history_length < window_length
         assert rail_type in C.RAIL_TYPES_TO_TRAIN
@@ -133,6 +135,7 @@ class RailroadDataset(Dataset):
         self.window_length = window_length
         self.history_length = history_length
         self.interval = interval
+        self.num_channels = C.NUM_CHANNEL_MAPPER[rail_type]
 
         self.df_data = _get_df(use_df_lane=(rail_type!='both'))  # dictionary of dictionary for (rail type, yaw type)
         self.df_index = _get_start_distance(mode=self.mode, val_type=self.val_type,
@@ -141,7 +144,14 @@ class RailroadDataset(Dataset):
                                             rail_type=rail_type, interval=interval)
 
         if self.mode == RunMode.TRAIN:
-            self.transform = Compose(transform=[])
+            self.transform = Compose(transform=[
+                aug.GaussianSmoothing(p=augmentation['gaussian_smoothing']['p'], 
+                                      num_channels=self.num_channels, 
+                                      sigma=augmentation['gaussian_smoothing']['sigma']),
+                aug.RescaleTime(p=augmentation['rescale_time']['p'], 
+                                min_scale_factor=augmentation['rescale_time']['min_scale_factor'], 
+                                max_scale_factor=augmentation['rescale_time']['max_scale_factor']),
+            ])
     
     def __len__(self):
         return len(self.df_index)
@@ -169,11 +179,15 @@ class RailroadDataset(Dataset):
         for col in C.PREDICT_COLS:
             x.loc[self.history_length:, col] = 0
 
-        x = np.transpose(np.expand_dims(x.values, axis=(0)), axes=(0, 2, 1)) # (1, channel, time)
-        y = np.transpose(np.expand_dims(y.values, axis=(0)), axes=(0, 2, 1)) # (1, 4, time)
+        x = np.transpose(x.values, axes=(1, 0)) # (channel, time)
+        y = np.transpose(y.values, axes=(1, 0)) # (4, time)
+
         # Data augmentation
         if self.mode == RunMode.TRAIN:
-            x = self.transform(x)
+            x, y = self.transform(x, y)
+
+        x = np.expand_dims(x, axis=(0)) # (1, channel, time)
+        y = np.expand_dims(y, axis=(0)) # (1, 4, time)
 
         return {'x': x.astype('float32'),
                 'y': y.astype('float32'),
