@@ -153,7 +153,7 @@ class RailModel(nn.Module):
             fusion_layers.append(FusionBlock(f_l + f_h, f_l))
         self.decoders = nn.ModuleList(fusion_layers)
 
-        drop_p = 0.1
+        drop_p = 0.01
         self.final_conv = nn.Sequential(
             nn.Conv2d(f_maps[0], 50, kernel_size=1, stride=1, padding=0, bias=True),
             nn.Dropout2d(p=drop_p),

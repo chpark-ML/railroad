@@ -2,10 +2,9 @@ gpu_num=$1
 
 cd /opt/railroad/projects/DC_prediction
 
-epoch=200
+epoch=100
 BS=4
 WD=1e-2
-LR=1e-3
 interval=100
 
 rail_type=straight
@@ -34,7 +33,6 @@ HYDRA_FULL_ERROR=1 python3 main.py \
   model.num_levels=${num_levels} \
   model.kernel=${kernel} \
   model.dilation=${dilation} \
-  scheduler.max_lr=${LR} \
   trainer.max_epoch=${epoch} \
   trainer.gpus=${gpu_num} \
   trainer.fast_dev_run=False
