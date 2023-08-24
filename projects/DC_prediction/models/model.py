@@ -44,7 +44,7 @@ class RailModel(nn.Module):
         self.channel_encoder = nn.ModuleList(cross_channel_layers)
 
         # catch dependency between [y, t'] (e.g., [4, 125])
-        self.global_encoder = M.MultiHeadSelfAttention(n_featuremap=f_maps[-1], n_heads=1,  d_k=f_maps[-1])
+        self.global_encoder = M.MultiHeadSelfAttention(n_featuremap=f_maps[-1], n_heads=1,  d_k=f_maps[-1] // 2)
 
         # create decoders
         fusion_layers = []
