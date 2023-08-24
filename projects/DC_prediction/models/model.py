@@ -7,11 +7,13 @@ import torch.nn.functional as F
 import projects.DC_prediction.utils.constants as C
 
 
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_seq_len=512):
-        super(PositionalEncoding, self).__init__()
+class EmbeddingBlock(nn.Module):
+    def __init__(self, d_model, kernel, max_seq_len=512):
+        super(EmbeddingBlock, self).__init__()
         self.d_model = d_model
         self.max_seq_len = max_seq_len
+        self.yaw_embedding = nn.Embedding(num_embeddings=len(C.YAW_TYPES), embedding_dim=d_model)
+        self.rail_embedding = nn.Conv2d(1, d_model, kernel_size=(1, kernel), stride=(1, 1), padding=(0, kernel//2), padding_mode='zeros', dilation=1, groups=1, bias=False)
         self.positional_encoding = self.generate_positional_encoding()
 
     def generate_positional_encoding(self):
@@ -22,10 +24,17 @@ class PositionalEncoding(nn.Module):
         pe[:, 1::2] = torch.cos(position * div_term)
         return pe.unsqueeze(0)  # Add batch dimension
 
-    def forward(self, x):
-        # Add positional encoding to the input tensor
-        x = x + self.positional_encoding[:, :x.size(-1), :].permute(0, 2, 1).unsqueeze(2).to(x.device)
-        return x
+    def forward(self, x, yaw=None):
+        x = self.rail_embedding(x)
+        pe = self.positional_encoding[:, :x.size(-1), :].permute(0, 2, 1).unsqueeze(2).to(x.device)
+
+        if yaw is not None:
+            yaw = self.yaw_embedding(yaw)
+            yaw = yaw.unsqueeze(2).unsqueeze(3).repeat((1, 1, x.size()[-2], x.size()[-1]))
+
+            return x + pe+ yaw
+
+        return  y + pe
     
 
 class FusionBlock(nn.Module):
@@ -42,44 +51,6 @@ class FusionBlock(nn.Module):
         x_concat = torch.cat([x_low, x_high], dim=1)
         x_concat = self.conv(x_concat)
         return x_concat
-
-
-class Block(nn.Module):
-    r""" ConvNeXt Block. There are two equivalent implementations:
-    (1) DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)
-    (2) DwConv -> Permute to (N, H, W, C); LayerNorm (channels_last) -> Linear -> GELU -> Linear; Permute back
-    We use (2) as we find it slightly faster in PyTorch
-    
-    Args:
-        dim (int): Number of input channels.
-        drop_path (float): Stochastic depth rate. Default: 0.0
-        layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
-    """
-    def __init__(self, inplanes, planes, kernel_size=5, stride=1, dilation=1, padding=0, drop_path=0., layer_scale_init_value=1e-6):
-        super().__init__()
-        self.dwconv = nn.Conv2d(inplanes, inplanes, kernel_size=7, padding=3, groups=inplanes) # depthwise conv
-        self.norm = nn.LayerNorm(dim, eps=1e-6)
-        self.pwconv1 = nn.Linear(inplanes, planes) # pointwise/1x1 convs, implemented with linear layers
-        self.act = nn.GELU()
-        self.pwconv2 = nn.Linear(planes, inplanes)
-        self.gamma = nn.Parameter(layer_scale_init_value * torch.ones((inplanes)), 
-                                    requires_grad=True) if layer_scale_init_value > 0 else None
-        self.drop_path = nn.Identity()
-
-    def forward(self, x):
-        input = x
-        x = self.dwconv(x)
-        x = x.permute(0, 2, 3, 1) # (N, C, H, W) -> (N, H, W, C)
-        x = self.norm(x)
-        x = self.pwconv1(x)
-        x = self.act(x)
-        x = self.pwconv2(x)
-        if self.gamma is not None:
-            x = self.gamma * x
-        x = x.permute(0, 3, 1, 2) # (N, H, W, C) -> (N, C, H, W)
-
-        x = input + self.drop_path(x)
-        return x
 
         
 class ResidualBlock(nn.Module):
@@ -155,21 +126,15 @@ class RailModel(nn.Module):
         self.num_channels = C.NUM_CHANNEL_MAPPER[rail_type]
         self.window_length = window_length
         self.out_channels = out_channels
-        
-        # TODO: This is tot done yet
-        self.yaw_embedding = nn.Embedding(num_embeddings=len(C.YAW_TYPES),
-                                          embedding_dim=in_planes)
 
-        self.pos_enc = PositionalEncoding(d_model=in_planes * 2, max_seq_len=self.window_length)
+        # embedding layer
+        self.embedding = EmbeddingBlock(d_model=in_planes, kernel=kernel, max_seq_len=self.window_length)
 
-        # embedding 
-        self.rail_embedding = nn.Conv2d(1, in_planes, kernel_size=(1, kernel), stride=(1, 1), padding=(0, kernel//2), padding_mode='zeros', dilation=1, groups=1, bias=False)
-
-        # create layers encoders
+        # create encoders
         dynamic_layers = []
         cross_channel_layers = []
         for idx, f in enumerate(f_maps):
-            dynamic_layers.append(ResidualBlock(inplanes=2 * self.inplanes if idx == 0 else self.inplanes, 
+            dynamic_layers.append(ResidualBlock(inplanes=self.inplanes, 
                                                 planes=f, kernel_size=(1, kernel),
                                                 stride=(1, 1) if idx == 0 else (1, kernel//2), 
                                                 dilation=(1, dilation), padding=(0, kernel//2 * dilation), flag_res=True))
@@ -207,16 +172,7 @@ class RailModel(nn.Module):
                     
     def forward(self, x: torch.Tensor, yaw: torch.Tensor = None):
         # embedding
-        x = self.rail_embedding(x)  # B, 16, C, 2500
-
-        if yaw is not None:
-            # FIXME: this code will NOT operate due to tensor dimension issue
-            yaw = self.yaw_embedding(yaw)
-            yaw = yaw.unsqueeze(2).unsqueeze(3).repeat((1, 1, x.size()[-2], x.size()[-1]))
-            x = torch.concat(tensors=[x, yaw], dim=1)  # B, 16, C, 2500
-
-        # positional encoding
-        x = self.pos_enc(x)  # B, 16, C, 2500
+        x = self.embedding(x, yaw)  # B, 16, C, 2500
 
         # encoder part
         c_encoders_features = []
