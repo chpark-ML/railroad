@@ -19,8 +19,8 @@ dilation=2
 
 HYDRA_FULL_ERROR=1 python3 main.py \
   experiment_tool.experiment_name=railroad-chpark \
-  experiment_tool.run_group=v4 \
-  experiment_tool.run_name=${rail_type}-draft \
+  experiment_tool.run_group=test \
+  experiment_tool.run_name=${rail_type}-test \
   optim.weight_decay=${WD} \
   loader.batch_size=${BS} \
   loader.dataset.val_type=${val_type} \

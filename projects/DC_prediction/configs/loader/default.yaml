@@ -8,6 +8,15 @@ dataset:
   history_length: 500
   rail_type: curved  # [curved, straight, both]
   interval: 30
+  augmentation:
+    gaussian_smoothing:
+      p: 0.5
+      sigma: 0.5
+    rescale_time:
+      p: 0.5
+      min_scale_factor: 0.9
+      max_scale_factor: 1.1
+
 
 batch_size: 4
 num_workers: 0
