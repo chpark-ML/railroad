@@ -8,13 +8,16 @@ import projects.DC_prediction.utils.constants as C
 
 
 class Classifier(nn.Module):
-    def __init__(self, inplanes, drop_p=0.1):
+    def __init__(self, inplanes, drop_p=0.01):
         super(Classifier, self).__init__()
         self.classifier = nn.Sequential(
             nn.Conv2d(inplanes, 50, kernel_size=1, bias=True),
             nn.Dropout2d(p=drop_p),
-            nn.GELU(),
-            nn.Conv2d(50, 1, kernel_size=1, bias=True))
+            nn.Sigmoid(),
+            nn.Conv2d(50, 30, kernel_size=1, bias=True),
+            nn.Dropout2d(p=drop_p),
+            nn.Sigmoid(),
+            nn.Conv2d(30, 1, kernel_size=1, bias=False))
 
     def forward(self, x):
         return self.classifier(x)
