@@ -13,7 +13,7 @@ defaults:
   - criterion: mape
   - model: model
   - optim: adamw
-  - scheduler: reduce_on_platua
+  - scheduler: one_cycle_lr
   - experiment_tool: mlflow
 
 run_modes:

@@ -5,109 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import projects.DC_prediction.utils.constants as C
-
-
-class EmbeddingBlock(nn.Module):
-    def __init__(self, d_model, kernel, max_seq_len=512):
-        super(EmbeddingBlock, self).__init__()
-        self.d_model = d_model
-        self.max_seq_len = max_seq_len
-        self.yaw_embedding = nn.Embedding(num_embeddings=len(C.YAW_TYPES), embedding_dim=d_model)
-        self.rail_embedding = nn.Conv2d(1, d_model, kernel_size=(1, kernel), stride=(1, 1), padding=(0, kernel//2), padding_mode='zeros', dilation=1, groups=1, bias=False)
-        self.positional_encoding = self.generate_positional_encoding()
-
-    def generate_positional_encoding(self):
-        pe = torch.zeros(self.max_seq_len, self.d_model)
-        position = torch.arange(0, self.max_seq_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, self.d_model, 2).float() * (-math.log(10000.0) / self.d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        return pe.unsqueeze(0)  # Add batch dimension
-
-    def forward(self, x, yaw=None):
-        x = self.rail_embedding(x)
-        pe = self.positional_encoding[:, :x.size(-1), :].permute(0, 2, 1).unsqueeze(2).to(x.device)
-
-        if yaw is not None:
-            yaw = self.yaw_embedding(yaw)
-            yaw = yaw.unsqueeze(2).unsqueeze(3).repeat((1, 1, x.size()[-2], x.size()[-1]))
-
-            return x + pe+ yaw
-
-        return  y + pe
-    
-
-class FusionBlock(nn.Module):
-    def __init__(self, inplanes, planes, kernel_size=1, stride=1, padding=0):
-        super(FusionBlock, self).__init__()
-        self.conv = ResidualBlock(inplanes=inplanes, planes=planes, kernel_size=kernel_size, stride=stride, padding=padding, flag_res=True)
-
-    def forward(self, x_low, x_high, **kwargs):
-        x_high = F.interpolate(x_high, scale_factor=(1, 2), mode='bilinear', align_corners=False)
-        
-        diff_t = x_low.size()[3] - x_high.size()[3]
-        x_high = F.pad(x_high, [diff_t // 2, diff_t - diff_t // 2])
-
-        x_concat = torch.cat([x_low, x_high], dim=1)
-        x_concat = self.conv(x_concat)
-        return x_concat
-
-        
-class ResidualBlock(nn.Module):
-    expansion = 1
-    def __init__(self, inplanes, planes, kernel_size=5, stride=1, dilation=1, padding=0, flag_res=True):
-        super(ResidualBlock, self).__init__()
-        self.padding = padding
-        self.dilation = dilation
-        self.flag_res = flag_res
-        self.conv1 = nn.Conv2d(inplanes, planes,
-                               kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation,
-                               padding_mode='zeros', bias=False)
-        # self.norm1 = nn.BatchNorm2d(planes, affine=True)
-        self.norm1 = nn.LayerNorm(planes, eps=1e-6)
-
-        self.conv2 = nn.Conv2d(planes, planes,
-                               kernel_size=1, stride=1, padding=0,
-                               padding_mode='zeros', bias=False)
-        # self.norm2 = nn.BatchNorm2d(planes, affine=True)
-        self.norm2 = nn.LayerNorm(planes, eps=1e-6)
-
-        if self.flag_res:
-            if stride != 1 or inplanes != planes * self.expansion :
-                self.downsample = nn.Sequential(
-                        nn.Linear(inplanes, planes * self.expansion),
-                        nn.LayerNorm(planes * self.expansion, eps=1e-6)
-                    )
-            else :
-                self.downsample = None
-
-        self.act_f = nn.GELU()
-
-    def forward(self, x, **kwargs):
-        residual = x
-        out = self.conv1(x)
-        out = out.permute(0, 2, 3, 1)
-        out = self.norm1(out)
-        out = out.permute(0, 3, 1, 2)
-        out = self.act_f(out)
-
-        out = self.conv2(out)
-        out = out.permute(0, 2, 3, 1)
-        out = self.norm2(out)
-        out = out.permute(0, 3, 1, 2)
-
-        if self.flag_res:
-            ## downsample the residual
-            if self.downsample is not None:
-                residual = residual.permute(0, 2, 3, 1)
-                residual = self.downsample(residual)
-                residual = residual.permute(0, 3, 1, 2)
-
-            ## crop and residual connection
-            out += residual[:, :, :out.size()[-2], :out.size()[-1]]
-
-        out = self.act_f(out)
-        return out
+import projects.DC_prediction.models.modules as M
     
 
 class RailModel(nn.Module):
@@ -128,64 +26,71 @@ class RailModel(nn.Module):
         self.out_channels = out_channels
 
         # embedding layer
-        self.embedding = EmbeddingBlock(d_model=in_planes, kernel=kernel, max_seq_len=self.window_length)
+        self.embedding = M.EmbeddingBlock(d_model=in_planes, kernel=7, max_seq_len=self.window_length)
 
         # create encoders
         dynamic_layers = []
         cross_channel_layers = []
         for idx, f in enumerate(f_maps):
-            dynamic_layers.append(ResidualBlock(inplanes=self.inplanes, 
-                                                planes=f, kernel_size=(1, kernel),
-                                                stride=(1, 1) if idx == 0 else (1, kernel//2), 
-                                                dilation=(1, dilation), padding=(0, kernel//2 * dilation), flag_res=True))
+            dynamic_layers.append(M.ResidualBlock(inplanes=self.inplanes, 
+                                                  planes=f, kernel_size=(1, kernel),
+                                                  stride=(1, 1) if idx == 0 else (1, kernel//2), 
+                                                  dilation=(1, dilation), padding=(0, kernel//2 * dilation), flag_res=True))
             cross_channel_layers.append(nn.Sequential(
-                ResidualBlock(inplanes=f, planes=f * self.out_channels, kernel_size=(self.num_channels, 1), stride=1, dilation=1, padding=0, flag_res=True),
+                M.ResidualBlock(inplanes=f, planes=f * self.out_channels, kernel_size=(self.num_channels, 1), stride=1, dilation=1, padding=0, flag_res=True),
             ))
             self.inplanes = f
-
         self.time_encoder = nn.ModuleList(dynamic_layers)
         self.channel_encoder = nn.ModuleList(cross_channel_layers)
+
+        # catch dependency between [y, t'] (e.g., [4, 125])
+        self.global_encoder = M.MultiHeadSelfAttention(n_featuremap=f_maps[-1], n_heads=1,  d_k=f_maps[-1])
 
         # create decoders
         fusion_layers = []
         r_f_maps = [f for f in f_maps[::-1]]
         for f_l, f_h in zip(r_f_maps[1:], r_f_maps[:-1]):
-            fusion_layers.append(FusionBlock(f_l + f_h, f_l))
+            fusion_layers.append(M.FusionBlock(f_l + f_h, f_l))
         self.decoders = nn.ModuleList(fusion_layers)
 
-        drop_p = 0.01
-        self.final_conv = nn.Sequential(
-            nn.Conv2d(f_maps[0], 50, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.Dropout2d(p=drop_p),
-            nn.Sigmoid(),
-            nn.Conv2d(50, 30, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.Dropout2d(p=drop_p),
-            nn.Sigmoid(),
-            nn.Conv2d(30, 1, kernel_size=1, stride=1, padding=0, bias=True),
-        )
+        # classifier
+        drop_p = 0.1
+        self.classifier = M.Classifier(f_maps[0], drop_p=drop_p)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.xavier_normal_(m.weight)
+                nn.init.xavier_uniform_(m.weight)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
                     
     def forward(self, x: torch.Tensor, yaw: torch.Tensor = None):
         # embedding
-        x = self.embedding(x, yaw)  # B, 16, C, 2500
-
+        x = self.embedding(x, yaw)  # torch.Size([4, 16, 37, 2000])
+        
         # encoder part
+        """
+        torch.Size([4, 16, 4, 2000])
+        torch.Size([4, 32, 4, 1000])
+        torch.Size([4, 64, 4, 500])
+        torch.Size([4, 128, 4, 250])
+        torch.Size([4, 256, 4, 125])
+        """
         c_encoders_features = []
         for t_encoder, c_encoder in zip(self.time_encoder, self.channel_encoder):
-            x = t_encoder(x)  # B, 32, C, 1250
-            x_c = c_encoder(x)  # B, 32, 1, 1250
-            x_c = x_c.view(x_c.shape[0], x_c.shape[1] // self.out_channels, self.out_channels, x_c.shape[3])  # B, 32 / 4, 4, 1250
+            x = t_encoder(x)  
+            x_c = c_encoder(x)  
+            x_c = x_c.view(x_c.shape[0], x_c.shape[1] // self.out_channels, self.out_channels, x_c.shape[3])  
             c_encoders_features.insert(0, x_c)
+
+        # prepare inputs for decoder
+        x_c = self.global_encoder(x_c)  # B, 256, 4, 125
         c_encoders_features = c_encoders_features[1:]
 
         # decoder part
         for decoder, encoder_feature in zip(self.decoders, c_encoders_features):
             x_c = decoder(encoder_feature, x_c)
 
-        x_c = self.final_conv(x_c)
+        # classifier
+        x_c = self.classifier(x_c)
+
         return x_c
