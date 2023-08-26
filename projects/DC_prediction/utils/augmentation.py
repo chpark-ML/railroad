@@ -30,7 +30,6 @@ class GaussianSmoothing:
 
         if random.random() <= self.p:
             smoothed_data = np.zeros_like(x)
-            smoothed_y = np.zeros_like(y)
             if self.mode == "normal":
                 _sigma = max(min(np.abs(np.random.normal(0, self.sigma_normal_scale)), 
                                  self.max_sigma), 
@@ -41,13 +40,10 @@ class GaussianSmoothing:
             for channel in range(self.num_channels):
                 smoothed_data[channel] = gaussian_filter1d(x[channel], sigma=_sigma)
 
-            for channel in range(len(C.PREDICT_COLS)):
-                smoothed_y[channel] = gaussian_filter1d(y[channel], sigma=_sigma)
         else:
             smoothed_data = x
-            smoothed_y = y
 
-        return smoothed_data, smoothed_y
+        return smoothed_data, y
     
 
 class RescaleTime:
