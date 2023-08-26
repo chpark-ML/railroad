@@ -9,11 +9,20 @@ import projects.DC_prediction.utils.constants as C
 
 
 class GaussianSmoothing:
-    def __init__(self, p: float = 0.5, num_channels: int = 32, sigma_normal_scale: float = 0.5):
+    def __init__(self, p: float = 0.5, num_channels: int = 32, 
+                 min_sigma: float = 0.1, 
+                 max_sigma: float = 16.0, 
+                 sigma_normal_scale: float = 2.0, 
+                 mode: str = "uniform"):
         assert 0. <= p <= 1.
+        assert min_sigma < max_sigma
+        assert mode == "uniform" or mode == "normal"
         self.p = p
         self.num_channels = num_channels
+        self.min_sigma = min_sigma
+        self.max_sigma = max_sigma
         self.sigma_normal_scale = sigma_normal_scale
+        self.mode = mode  # ["uniform", "normal"]
 
     def __call__(self, x: np.ndarray, y: np.ndarray):
         assert x.ndim == 2
@@ -22,9 +31,16 @@ class GaussianSmoothing:
         if random.random() <= self.p:
             smoothed_data = np.zeros_like(x)
             smoothed_y = np.zeros_like(y)
-            _sigma=np.abs(np.random.normal(0, self.sigma_normal_scale))
+            if self.mode == "normal":
+                _sigma = max(min(np.abs(np.random.normal(0, self.sigma_normal_scale)), 
+                                 self.max_sigma), 
+                                 self.min_sigma)
+            elif self.mode == "uniform":
+                _sigma = np.random.uniform(self.min_sigma, self.max_sigma)
+
             for channel in range(self.num_channels):
                 smoothed_data[channel] = gaussian_filter1d(x[channel], sigma=_sigma)
+
             for channel in range(len(C.PREDICT_COLS)):
                 smoothed_y[channel] = gaussian_filter1d(y[channel], sigma=_sigma)
         else:

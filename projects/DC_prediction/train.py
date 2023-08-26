@@ -12,11 +12,13 @@ import optuna
 import torch
 import torch.backends.cudnn as cudnn
 import torch.cuda.amp as amp
+import torch.nn.functional as F
 import torch.nn.parallel as tnp
 import tqdm
 from sklearn import metrics
 from torch.utils.data.distributed import DistributedSampler
 
+import projects.DC_prediction.utils.constants as C
 from projects.DC_prediction.utils import experiment_tool as et
 from projects.DC_prediction.utils.enums import RunMode
 from projects.DC_prediction.utils.utils import (
@@ -247,6 +249,7 @@ class Trainer():
 
         return losses.detach(), result_dict
 
+    @classmethod
     def _inference(self, loader):
         list_logits = []
         list_annots = []
@@ -256,10 +259,27 @@ class Trainer():
             y = data['y'].to(self.device)
             yaw = data['yaw'].to(self.device)
             _check_any_nan(x)
-            logits = self.model(x, yaw)
+            
+            if loader.dataset.test_input_length == loader.dataset.window_length:
+                logits = self.model(x, yaw)
+            else:
+                _interval = loader.dataset.window_length // 2
+                _num_windowing = 1 + int(np.ceil((x.size(3) - loader.dataset.window_length) / _interval))
+                _expected_size = loader.dataset.window_length + int(np.ceil((x.size(3) - loader.dataset.window_length) / _interval)) * _interval
+                diff_t = _expected_size - loader.dataset.test_input_length
+                x_padded = F.pad(x, [0, diff_t, 0, 0])
+                logits = torch.zeros((x.size(0), 1, len(C.PREDICT_COLS), x.size(3)))
+                counters = torch.zeros((x.size(0), 1, len(C.PREDICT_COLS), x.size(3)))
+                for i in range(_num_windowing):
+                    start_index = i * _interval
+                    end_index = start_index + loader.dataset.window_length 
+                    logits_padded = self.model(x_padded[:, :, :, start_index: end_index], yaw)
+                    logits[:, :, :, start_index: end_index] = logits_padded
+                    counters[:, :, :, start_index: end_index] += 1
+                logits = (logits / counters)[:, :, :, :x.size(3)]
 
-            list_logits.append(logits)
-            list_annots.append(y)
+                list_logits.append(logits)
+                list_annots.append(y)
 
             if self.fast_dev_run:
                 # Runs 1 train batch and program ends if 'fast_dev_run' set to 'True'

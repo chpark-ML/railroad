@@ -13,6 +13,7 @@ def _get_start_distance(mode: RunMode,
                         val_type: str,
                         window_length: int,
                         history_length: int,
+                        test_input_length: int,
                         rail_type: str = "curved",
                         interval: int = 50) -> pd.DataFrame:
     assert rail_type in C.RAIL_TYPES_TO_TRAIN
@@ -133,8 +134,12 @@ class RailroadDataset(Dataset):
         self.mode: RunMode = RunMode(mode) if isinstance(mode, str) else mode
         self.val_type = val_type
         self.window_length = window_length 
-
         self.history_length = history_length
+        self.test_input_length = window_length
+        if self.mode == RunMode.TEST and self.test_input_length < C.PREDICT_LENGHT:
+            self.test_input_length = C.PREDICT_LENGHT + self.history_length
+            assert self.test_input_length % 2 == 0
+            
         self.interval = interval
         self.num_channels = C.NUM_CHANNEL_MAPPER[rail_type]
 
@@ -142,12 +147,16 @@ class RailroadDataset(Dataset):
         self.df_index = _get_start_distance(mode=self.mode, val_type=self.val_type,
                                             window_length=self.window_length,
                                             history_length=self.history_length,
+                                            test_input_length=self.test_input_length,
                                             rail_type=rail_type, interval=interval)
 
         if self.mode == RunMode.TRAIN:
             self.transform = Compose(transform=[
-                aug.GaussianSmoothing(p=augmentation['gaussian_smoothing']['p'], 
-                                      num_channels=self.num_channels, 
+                aug.GaussianSmoothing(p=augmentation['gaussian_smoothing']['p'],
+                                      num_channels=self.num_channels,
+                                      mode=augmentation['gaussian_smoothing']['mode'],
+                                      min_sigma=augmentation['gaussian_smoothing']['min_sigma'],
+                                      max_sigma=augmentation['gaussian_smoothing']['max_sigma'],
                                       sigma_normal_scale=augmentation['gaussian_smoothing']['sigma_normal_scale']),
                 aug.RescaleTime(p=augmentation['rescale_time']['p'], 
                                 min_scale_factor=augmentation['rescale_time']['min_scale_factor'], 
@@ -175,10 +184,14 @@ class RailroadDataset(Dataset):
         yaw = elem['yaw_type']
         data = self.df_data[rail][yaw]
 
-        x = data.loc[sd : sd+self.window_length-1].copy()
-        y = data.loc[sd : sd+self.window_length-1].loc[:, C.PREDICT_COLS].copy()
-        for col in C.PREDICT_COLS:
-            x.loc[self.history_length:, col] = 0
+        if self.mode == RunMode.TRAIN or self.mode == RunMode.VALIDATE:
+            x = data.loc[sd : sd+self.window_length-1].copy()
+            y = data.loc[sd : sd+self.window_length-1].loc[:, C.PREDICT_COLS].copy()
+            for col in C.PREDICT_COLS:
+                x.loc[self.history_length if self.mode == RunMode.VALIDATE else np.random.uniform(0, self.history_length):, col] = 0
+        elif self.mode == RunMode.TEST:
+            x = data.loc[sd : ].copy()
+            y = data.loc[sd : ].loc[:, C.PREDICT_COLS].copy()
 
         x = np.transpose(x.values, axes=(1, 0)) # (channel, time)
         y = np.transpose(y.values, axes=(1, 0)) # (4, time)
