@@ -27,7 +27,7 @@ class RailModel(nn.Module):
 
         # conv block
         self.rail_embedding = nn.Sequential(
-            nn.Conv2d(1, in_planes, kernel_size=(1, 3), stride=1, padding=(0, 1), bias=False),
+            nn.Conv2d(1, in_planes, kernel_size=(1, 5), stride=1, padding=(0, 2), bias=False),
             nn.BatchNorm2d(in_planes),
             nn.LeakyReLU(inplace=True),
         )
@@ -38,14 +38,14 @@ class RailModel(nn.Module):
         for idx, f in enumerate(f_maps):
 
             if idx == 0 :
-                _kernel = (1, 3)
+                _kernel = (1, kernel)
                 _stride = (1, 1)
                 _dilation = (1, 1)
                 _padding = (0, _kernel[-1]//2)
             else :
                 _kernel = (1, kernel)
                 _stride = (1, 2)
-                _dilation = (1, 2)
+                _dilation = (1, dilation)
                 _padding = (0, kernel//2 * dilation)
                 
             dynamic_layers.append(M.ResidualBlock(inplanes=self.inplanes, 
@@ -84,10 +84,16 @@ class RailModel(nn.Module):
         
         # encoder part
         """
-        torch.Size([4, 32, 4, 2500])
-        torch.Size([4, 64, 4, 1250])
-        torch.Size([4, 128, 4, 625])
-        torch.Size([4, 256, 4, 313])
+        torch.Size([4, 32, 4, 500])
+        torch.Size([4, 64, 4, 250])
+        torch.Size([4, 128, 4, 125])
+        torch.Size([4, 256, 4, 63])
+        torch.Size([4, 512, 4, 32])
+
+        torch.Size([4, 32, 4, 200])
+        torch.Size([4, 64, 4, 100])
+        torch.Size([4, 128, 4, 50])
+        torch.Size([4, 256, 4, 25])
         """
         c_encoders_features = []
         for t_encoder, c_encoder in zip(self.time_encoder, self.channel_encoder):
@@ -102,11 +108,6 @@ class RailModel(nn.Module):
         c_encoders_features = c_encoders_features[1:]
 
         # decoder part
-        """
-        torch.Size([4, 128, 4, 625])
-        torch.Size([4, 64, 4, 1250])
-        torch.Size([4, 32, 4, 2500])
-        """
         for decoder, encoder_feature in zip(self.decoders, c_encoders_features):
             x_c = decoder(encoder_feature, x_c)
 

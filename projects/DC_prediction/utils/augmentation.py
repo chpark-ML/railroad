@@ -5,26 +5,33 @@ import torch
 import torch.nn.functional as F
 from scipy.ndimage import gaussian_filter1d
 
+import projects.DC_prediction.utils.constants as C
+
 
 class GaussianSmoothing:
-    def __init__(self, p: float = 0.5, num_channels: int = 32, sigma: float = 0.5):
+    def __init__(self, p: float = 0.5, num_channels: int = 32, sigma_normal_scale: float = 0.5):
         assert 0. <= p <= 1.
         self.p = p
         self.num_channels = num_channels
-        self.sigma = sigma
+        self.sigma_normal_scale = sigma_normal_scale
 
     def __call__(self, x: np.ndarray, y: np.ndarray):
         assert x.ndim == 2
         assert y.ndim == 2
-    
+
         if random.random() <= self.p:
             smoothed_data = np.zeros_like(x)
+            smoothed_y = np.zeros_like(y)
+            _sigma=np.abs(np.random.normal(0, self.sigma_normal_scale))
             for channel in range(self.num_channels):
-                smoothed_data[channel] = gaussian_filter1d(x[channel], self.sigma)
+                smoothed_data[channel] = gaussian_filter1d(x[channel], sigma=_sigma)
+            for channel in range(len(C.PREDICT_COLS)):
+                smoothed_y[channel] = gaussian_filter1d(y[channel], sigma=_sigma)
         else:
             smoothed_data = x
+            smoothed_y = y
 
-        return smoothed_data, y
+        return smoothed_data, smoothed_y
     
 
 class RescaleTime:

@@ -148,7 +148,7 @@ class RailroadDataset(Dataset):
             self.transform = Compose(transform=[
                 aug.GaussianSmoothing(p=augmentation['gaussian_smoothing']['p'], 
                                       num_channels=self.num_channels, 
-                                      sigma=augmentation['gaussian_smoothing']['sigma']),
+                                      sigma_normal_scale=augmentation['gaussian_smoothing']['sigma_normal_scale']),
                 aug.RescaleTime(p=augmentation['rescale_time']['p'], 
                                 min_scale_factor=augmentation['rescale_time']['min_scale_factor'], 
                                 max_scale_factor=augmentation['rescale_time']['max_scale_factor']),
