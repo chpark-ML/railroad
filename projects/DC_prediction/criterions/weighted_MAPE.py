@@ -27,7 +27,7 @@ class WeightedMAPE(nn.Module):
         MSE_loss = torch.mean(torch.sum(
             F.mse_loss(logits, annots, reduction='none') * weights, dim=3) / torch.sum(weights))
         
-        _alpha = (1 - min(1, (max(1, epoch) / self.max_epoch))) * self.alpha_mse
+        _alpha = (1 - min(1, (max(1, epoch) / self.max_epoch))) * self.alpha_mse if epoch else self.alpha_mse
         hybrid_errors = MSE_loss * _alpha + MAPE_loss * (1 - _alpha)
         
         loss_dict = {
