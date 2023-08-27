@@ -16,7 +16,7 @@ sigma_normal_scale=2.0
 BS=4
 LR=1e-2
 WD=1e-4
-alpha_mse=0.5
+alpha_mse=1.0
 
 in_planes=8
 f_maps=64
