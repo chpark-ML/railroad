@@ -23,7 +23,7 @@ class WeightedMAPE(nn.Module):
 
         abs_errors = torch.abs(logits - annots)
         MAPE_loss = torch.mean(torch.sum(
-            (abs_errors / torch.abs(annots).clamp(min=1e-4) * 100) * weights, dim=3) / torch.sum(weights))
+            (abs_errors / torch.abs(annots).clamp(min=1e-6) * 100) * weights, dim=3) / torch.sum(weights))
         MSE_loss = torch.mean(torch.sum(
             F.mse_loss(logits, annots, reduction='none') * weights, dim=3) / torch.sum(weights))
         
