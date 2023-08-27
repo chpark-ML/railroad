@@ -13,7 +13,7 @@ import tqdm
 from omegaconf import DictConfig, OmegaConf
 
 import projects.DC_prediction.utils.constants as C
-import projects.DC_prediction.analysis.model_path as MP
+import projects.DC_prediction.utils.model_path as MP
 from projects.DC_prediction.train import _get_loaders_and_trainer
 from projects.DC_prediction.utils.enums import RunMode
 from projects.DC_prediction.utils.utils import set_config

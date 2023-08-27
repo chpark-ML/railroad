@@ -10,8 +10,8 @@ import projects.DC_prediction.utils.constants as C
 
 class GaussianSmoothing:
     def __init__(self, p: float = 0.5, num_channels: int = 32, 
-                 min_sigma: float = 0.1, 
-                 max_sigma: float = 16.0, 
+                 min_sigma: float = 0.001, 
+                 max_sigma: float = 0.1, 
                  sigma_normal_scale: float = 2.0, 
                  mode: str = "uniform"):
         assert 0. <= p <= 1.

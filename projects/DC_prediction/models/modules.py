@@ -11,20 +11,15 @@ class Classifier(nn.Module):
     def __init__(self, inplanes, drop_p=0.2):
         super(Classifier, self).__init__()
         self.classifier = nn.Sequential(
-            nn.Conv2d(inplanes, 50, kernel_size=1, bias=True),
-            nn.Dropout2d(p=drop_p),
-            nn.Sigmoid(),
-            nn.Conv2d(50, 30, kernel_size=1, bias=True),
-            nn.Dropout2d(p=drop_p),
-            nn.Sigmoid(),
-            nn.Conv2d(30, 1, kernel_size=1, bias=False))
+            nn.Conv2d(inplanes, 1, kernel_size=1, bias=True),
+            )
 
     def forward(self, x):
         return self.classifier(x)
 
 
 class EmbeddingBlock(nn.Module):
-    def __init__(self, d_model, kernel, max_seq_len=512):
+    def __init__(self, d_model, max_seq_len=512):
         super(EmbeddingBlock, self).__init__()
         self.d_model = d_model
         self.max_seq_len = max_seq_len

@@ -192,7 +192,7 @@ class Trainer():
             # forward propagation
             with torch.autocast(device_type=self.device.type, enabled=self.use_amp):
                 logits = self.model(x, yaw)
-                loss = self.criterion(logits, y)
+                loss = self.criterion(logits, y, epoch)["hybrid"]
                 train_losses.append(loss.detach())
 
             # set trace for checking nan values
@@ -244,12 +244,11 @@ class Trainer():
         return Metrics()
 
     def get_metrics(self, preds, annots):
-        losses = self.criterion(preds, annots)
+        losses = self.criterion(preds, annots)["MAPE"]
         result_dict = {}
 
         return losses.detach(), result_dict
 
-    @classmethod
     def _inference(self, loader):
         list_logits = []
         list_annots = []
@@ -268,8 +267,8 @@ class Trainer():
                 _expected_size = loader.dataset.window_length + int(np.ceil((x.size(3) - loader.dataset.window_length) / _interval)) * _interval
                 diff_t = _expected_size - loader.dataset.test_input_length
                 x_padded = F.pad(x, [0, diff_t, 0, 0])
-                logits = torch.zeros((x.size(0), 1, len(C.PREDICT_COLS), x.size(3)))
-                counters = torch.zeros((x.size(0), 1, len(C.PREDICT_COLS), x.size(3)))
+                logits = torch.zeros((x.size(0), 1, len(C.PREDICT_COLS), x.size(3))).to(self.device)
+                counters = torch.zeros((x.size(0), 1, len(C.PREDICT_COLS), x.size(3))).to(self.device)
                 for i in range(_num_windowing):
                     start_index = i * _interval
                     end_index = start_index + loader.dataset.window_length 
@@ -278,8 +277,8 @@ class Trainer():
                     counters[:, :, :, start_index: end_index] += 1
                 logits = (logits / counters)[:, :, :, :x.size(3)]
 
-                list_logits.append(logits)
-                list_annots.append(y)
+            list_logits.append(logits)
+            list_annots.append(y)
 
             if self.fast_dev_run:
                 # Runs 1 train batch and program ends if 'fast_dev_run' set to 'True'

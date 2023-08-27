@@ -59,7 +59,7 @@ class RailModel(nn.Module):
         self.channel_encoder = nn.ModuleList(cross_channel_layers)
 
         # catch dependency between [y, t'] (e.g., [4, 125])
-        self.embedding = M.EmbeddingBlock(d_model=f_maps[-1], kernel=1, max_seq_len=self.window_length)
+        self.embedding = M.EmbeddingBlock(d_model=f_maps[-1], max_seq_len=self.window_length)
         self.global_encoder = M.MultiHeadSelfAttention(n_featuremap=f_maps[-1], n_heads=1,  d_k=f_maps[-1] // 2)
 
         # create decoders
