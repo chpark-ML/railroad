@@ -192,7 +192,7 @@ class Trainer():
             # forward propagation
             with torch.autocast(device_type=self.device.type, enabled=self.use_amp):
                 logits = self.model(x, yaw)
-                loss = self.criterion(logits, y, epoch)["hybrid"]
+                loss = self.criterion(logits, y)["hybrid"]
                 train_losses.append(loss.detach())
 
             # set trace for checking nan values

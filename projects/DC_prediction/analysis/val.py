@@ -107,8 +107,12 @@ def main() -> None:
         
         preds, annots = _inference(model, loaders[RunMode.VALIDATE], device)  # (B, 4, 2500)
         
-
-        # TODO... check if index is correct...
+        assert preds.size(0) == 5 or preds.size(0) == 10
+        assert annots.size(0) == 5 or annots.size(0) == 10
+        if preds.size(0) == 10:
+            preds = preds[C.RAIL_MAPPER[rail] * 5 : (C.RAIL_MAPPER[rail]+1) * 5]
+            annots = annots[C.RAIL_MAPPER[rail] * 5 : (C.RAIL_MAPPER[rail]+1) * 5]
+        
         for col in C.PREDICT_COLS:
             for yaw in C.YAW_TYPES:
                 target_col = f'{col}_{rail[0]}{yaw}'

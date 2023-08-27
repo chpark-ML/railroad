@@ -102,9 +102,13 @@ def main() -> None:
         loaders = {mode: hydra.utils.instantiate(config.loader,
                                                 dataset={'mode': mode}, shuffle=(mode == RunMode.TRAIN),
                                                 drop_last=(mode == RunMode.TRAIN)) for mode in run_modes}
+        
         preds, _ = _inference(model, loaders[RunMode.TEST], device)  # (B, 4, 2500)
         
-        # TODO... check if index is correct...
+        assert preds.size(0) == 5 or preds.size(0) == 10
+        if preds.size(0) == 10:
+            preds = preds[C.RAIL_MAPPER[rail] * 5 : (C.RAIL_MAPPER[rail]+1) * 5]
+        
         for col in C.PREDICT_COLS:
             for yaw in C.YAW_TYPES:
                 target_col = f'{col}_{rail[0]}{yaw}'
