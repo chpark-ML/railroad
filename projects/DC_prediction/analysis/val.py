@@ -99,25 +99,37 @@ def main() -> None:
         device = torch.device(torch_device)
 
         model = load_checkpoint(model, ckpt_path, device)
-
+        
         run_modes = [RunMode('val')]
         loaders = {mode: hydra.utils.instantiate(config.loader,
                                                 dataset={'mode': mode}, shuffle=(mode == RunMode.TRAIN),
                                                 drop_last=(mode == RunMode.TRAIN)) for mode in run_modes}
         
         preds, annots = _inference(model, loaders[RunMode.VALIDATE], device)  # (B, 4, 2500)
-        
+        criterion = hydra.utils.instantiate(config.criterion)
+        losses = criterion(preds, annots)["MAPE"]
+        print(f"losses: {losses}")
         assert preds.size(0) == 5 or preds.size(0) == 10
         assert annots.size(0) == 5 or annots.size(0) == 10
-        if preds.size(0) == 10:
-            preds = preds[C.RAIL_MAPPER[rail] * 5 : (C.RAIL_MAPPER[rail]+1) * 5]
-            annots = annots[C.RAIL_MAPPER[rail] * 5 : (C.RAIL_MAPPER[rail]+1) * 5]
         
-        for col in C.PREDICT_COLS:
-            for yaw in C.YAW_TYPES:
-                target_col = f'{col}_{rail[0]}{yaw}'
-                new_df_y_pred.loc[:, target_col] = preds[C.YAW_MAPPER[yaw], 0, C.PREDICT_COL_MAPPER[col], :].detach().cpu().numpy()
-                new_df_annot.loc[:, target_col] = annots[C.YAW_MAPPER[yaw], 0, C.PREDICT_COL_MAPPER[col], :].detach().cpu().numpy()
+        if preds.size(0) == 10:
+            print('both type!')
+            for rail in C.RAIL_TYPES:
+                _preds = preds[C.RAIL_MAPPER[rail] * 5 : (C.RAIL_MAPPER[rail]+1) * 5]
+                _annots = annots[C.RAIL_MAPPER[rail] * 5 : (C.RAIL_MAPPER[rail]+1) * 5]
+                for col in C.PREDICT_COLS:
+                    for yaw in C.YAW_TYPES:
+                        target_col = f'{col}_{rail[0]}{yaw}'
+                        new_df_y_pred.loc[:, target_col] = _preds[C.YAW_MAPPER[yaw], 0, C.PREDICT_COL_MAPPER[col], :].detach().cpu().numpy()
+                        new_df_annot.loc[:, target_col] = _annots[C.YAW_MAPPER[yaw], 0, C.PREDICT_COL_MAPPER[col], :].detach().cpu().numpy()
+            break
+
+        else:
+            for col in C.PREDICT_COLS:
+                for yaw in C.YAW_TYPES:
+                    target_col = f'{col}_{rail[0]}{yaw}'
+                    new_df_y_pred.loc[:, target_col] = preds[C.YAW_MAPPER[yaw], 0, C.PREDICT_COL_MAPPER[col], :].detach().cpu().numpy()
+                    new_df_annot.loc[:, target_col] = annots[C.YAW_MAPPER[yaw], 0, C.PREDICT_COL_MAPPER[col], :].detach().cpu().numpy()
     
     new_df_y_pred.to_csv('/opt/railroad/projects/DC_prediction/analysis/result_val_pred.csv', index=False)
     new_df_annot.to_csv('/opt/railroad/projects/DC_prediction/analysis/result_val_annot.csv', index=False)

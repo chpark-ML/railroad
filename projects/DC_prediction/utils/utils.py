@@ -40,7 +40,8 @@ def _seed_everything(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 def set_config(config: OmegaConf, default_config_path: str = _DEFAULT_CONFIG_FILE) -> OmegaConf:
     """

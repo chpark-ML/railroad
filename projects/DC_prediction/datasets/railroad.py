@@ -172,7 +172,7 @@ class RailroadDataset(Dataset):
         Resize -> Windowing -> Additional data augmentation
         """
         elem = self.df_index.iloc[index]
-    
+
         sd = elem['start_distance']
         if self.interval is not None and self.mode == RunMode.TRAIN:
             # Add stochasticity to starting distance.

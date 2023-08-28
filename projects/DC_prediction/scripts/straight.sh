@@ -11,7 +11,7 @@ val_type=pre
 
 BS=4
 LR=1e-2
-WD=1e-2
+WD=1e-5
 alpha_mse=0.2
 
 in_planes=8

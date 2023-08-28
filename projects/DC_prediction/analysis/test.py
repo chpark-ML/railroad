@@ -107,12 +107,20 @@ def main() -> None:
         
         assert preds.size(0) == 5 or preds.size(0) == 10
         if preds.size(0) == 10:
-            preds = preds[C.RAIL_MAPPER[rail] * 5 : (C.RAIL_MAPPER[rail]+1) * 5]
-        
-        for col in C.PREDICT_COLS:
-            for yaw in C.YAW_TYPES:
-                target_col = f'{col}_{rail[0]}{yaw}'
-                df_ans.loc[:, target_col] = preds[C.YAW_MAPPER[yaw], 0, C.PREDICT_COL_MAPPER[col], -len(df_ans):].detach().cpu().numpy()
+            print('both type!')
+            for rail in C.RAIL_TYPES:
+                _preds = preds[C.RAIL_MAPPER[rail] * 5 : (C.RAIL_MAPPER[rail]+1) * 5]
+                for col in C.PREDICT_COLS:
+                    for yaw in C.YAW_TYPES:
+                        target_col = f'{col}_{rail[0]}{yaw}'
+                        df_ans.loc[:, target_col] = _preds[C.YAW_MAPPER[yaw], 0, C.PREDICT_COL_MAPPER[col], -len(df_ans):].detach().cpu().numpy()
+            break
+
+        else:
+            for col in C.PREDICT_COLS:
+                for yaw in C.YAW_TYPES:
+                    target_col = f'{col}_{rail[0]}{yaw}'
+                    df_ans.loc[:, target_col] = preds[C.YAW_MAPPER[yaw], 0, C.PREDICT_COL_MAPPER[col], -len(df_ans):].detach().cpu().numpy()
     
     df_ans.to_csv('/opt/railroad/projects/DC_prediction/analysis/result_test.csv', index=False)
 

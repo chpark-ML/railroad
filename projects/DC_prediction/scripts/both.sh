@@ -1,13 +1,14 @@
 gpu_num=0
 cd /opt/railroad/projects/DC_prediction
 
-exp_name=baseline
+exp_name=submit
 
 epoch=50
 interval=50
 window_length=500
 history_length=0
 val_type=pre
+seed=1234
 
 BS=4
 LR=1e-2
@@ -22,9 +23,10 @@ dilation=2
 
 rail_type=both
 HYDRA_FULL_ERROR=1 python3 main.py \
+    seed=${seed} \
     experiment_tool.experiment_name=railroad-chpark \
     experiment_tool.run_group=${exp_name} \
-    experiment_tool.run_name=${exp_name}-${rail_type}-epoch${epoch}-inter${interval}-LR${LR}-hist${history_length} \
+    experiment_tool.run_name=${exp_name}-${rail_type}-val-${val_type}-BS${BS} \
     optim.weight_decay=${WD} \
     loader.batch_size=${BS} \
     loader.dataset.val_type=${val_type} \
