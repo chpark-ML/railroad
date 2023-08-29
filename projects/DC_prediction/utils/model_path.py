@@ -7,7 +7,7 @@ MODEL_PATH = [
     "best",
     ]
 
-MODEL_PATH = [ Path(path) for path in MODEL_PATH]
+MODEL_PATH = [ MODEL_PATH_BASE / Path(path) for path in MODEL_PATH]
 
 TARGET_MODEL_PATH = {
     'curved': MODEL_PATH[0],
