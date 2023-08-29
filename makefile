@@ -4,6 +4,11 @@ SERVICE_NAME_BASE = ${SERVICE_NAME}-base
 SERVICE_NAME_DEV = ${SERVICE_NAME}-dev
 SERVICE_NAME_DEV_MAC = ${SERVICE_NAME}-dev-mac
 
+# Set working & current path 
+DATA_PATH = /data/railroad
+WORKDIR_PATH = /opt/${SERVICE_NAME}
+CURRENT_PATH = $(shell pwd)
+
 # Set command
 COMMAND_BASE = /bin/bash
 COMMAND_PROD = /bin/bash
@@ -34,10 +39,6 @@ DOCKERFILE_NAME_DEV_MAC = dockerfile_dev_mac
 DOCKER_COMPOSE_NAME = docker_compose.yaml
 ENV_FILE_PATH = ${DOCKER_BUILD_CONTEXT_PATH}/.env
 
-# Set working & current path 
-WORKDIR_PATH = /opt/${SERVICE_NAME}
-CURRENT_PATH = $(shell pwd)
-
 # Set enviornments
 ENV_TEXT = "$\
 	GID=${GID}\n$\
@@ -49,6 +50,7 @@ ENV_TEXT = "$\
 	IMAGE_NAME_DEV_MAC=${IMAGE_NAME_DEV_MAC}\n$\
 	CONTAINER_NAME_DEV=${CONTAINER_NAME_DEV}\n$\
 	CONTAINER_NAME_DEV_MAC=${CONTAINER_NAME_DEV_MAC}\n$\
+	DATA_PATH=${DATA_PATH}\n$\
 	WORKDIR_PATH=${WORKDIR_PATH}\n$\
 	CURRENT_PATH=${CURRENT_PATH}\n$\
 	DOCKER_BUILD_CONTEXT_PATH=${DOCKER_BUILD_CONTEXT_PATH}\n$\

@@ -15,9 +15,8 @@ services:
     stdin_open: true
     volumes:
       - ${CURRENT_PATH}:${WORKDIR_PATH} 
-      - /data/railroad:/data/railroad
+      - ${DATA_PATH}:/data/railroad
     working_dir: ${WORKDIR_PATH}
-    # user: ${UID}:${GID}
     build:
       target: ${TARGET_STAGE:-train}
       context: ${DOCKER_BUILD_CONTEXT_PATH}
@@ -36,27 +35,3 @@ services:
             - driver: nvidia
               count: all
               capabilities: [ gpu ]
-
-  railroad-dev-mac:
-    hostname: railroad-dev-mac
-    image: ${IMAGE_NAME_DEV_MAC}
-    container_name: ${CONTAINER_NAME_DEV_MAC}
-    ipc: host 
-    tty: true
-    stdin_open: true
-    volumes:
-      - ${CURRENT_PATH}:${WORKDIR_PATH} 
-      - /data/railroad:/data/railroad
-    working_dir: ${WORKDIR_PATH}
-    # user: ${UID}:${GID}
-    build:
-      target: ${TARGET_STAGE:-train}
-      context: ${DOCKER_BUILD_CONTEXT_PATH}
-      dockerfile: ${DOCKERFILE_NAME_DEV_MAC}
-      args: 
-        BASE_IMAGE: ${IMAGE_NAME_BASE}
-        WORKDIR_PATH: ${WORKDIR_PATH:-/opt/railroad}
-        GRP: ${GRP:-noname}
-        USR: ${USR:-noname}
-        GID: ${GID:-noname}
-        UID: ${UID:-noname}
